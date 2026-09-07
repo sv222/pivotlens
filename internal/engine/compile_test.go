@@ -143,3 +143,108 @@ func TestFilterWhereEscapesQuote(t *testing.T) {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
+
+const demoPrefix = `WITH base AS (SELECT "region" AS "region", "amount" AS "amount" FROM src), ` +
+	`filtered AS (SELECT * FROM base) `
+
+func TestPageSQLDefault(t *testing.T) {
+	got, err := demoSpec().PageSQL(100, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := demoPrefix + `SELECT * FROM filtered LIMIT 100 OFFSET 0`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestPageSQLSorted(t *testing.T) {
+	q := demoSpec()
+	q.Sort = []SortKey{{Col: "amount", Desc: true}}
+	got, err := q.PageSQL(50, 200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := demoPrefix + `SELECT * FROM filtered ORDER BY "amount" DESC LIMIT 50 OFFSET 200`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestCountSQL(t *testing.T) {
+	got, err := demoSpec().CountSQL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := demoPrefix + `SELECT count(*) FROM filtered`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestWidthsSQL(t *testing.T) {
+	got, err := demoSpec().WidthsSQL(1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := demoPrefix + `SELECT max(length(CAST("region" AS VARCHAR))), ` +
+		`max(length(CAST("amount" AS VARCHAR))) FROM (SELECT * FROM filtered LIMIT 1000)`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestPivotSQL(t *testing.T) {
+	q := demoSpec()
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Agg: "sum", AggCol: "amount"}
+	got, err := q.PageSQL(100, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := demoPrefix + `PIVOT filtered ON "amount" USING sum("amount") GROUP BY "region" LIMIT 100 OFFSET 0`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestPivotRequiresRowsAndOn(t *testing.T) {
+	q := demoSpec()
+	q.Pivot = &PivotSpec{On: "amount", Agg: "count"}
+	if _, err := q.PageSQL(1, 0); err == nil {
+		t.Error("pivot without row groups must fail")
+	}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, Agg: "count"}
+	if _, err := q.PageSQL(1, 0); err == nil {
+		t.Error("pivot without a pivot column must fail")
+	}
+}
+
+func TestWidthsSQLRejectsPivot(t *testing.T) {
+	q := demoSpec()
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Agg: "count"}
+	if _, err := q.WidthsSQL(10); err == nil {
+		t.Error("WidthsSQL must refuse a pivot spec")
+	}
+}
+
+func TestExportSQL(t *testing.T) {
+	got, err := demoSpec().ExportSQL("out.parquet", "parquet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `COPY (` + demoPrefix + `SELECT * FROM filtered) TO 'out.parquet' (FORMAT parquet)`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	got, err = demoSpec().ExportSQL("out.csv", "csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = `COPY (` + demoPrefix + `SELECT * FROM filtered) TO 'out.csv' (FORMAT csv, HEADER)`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	if _, err := demoSpec().ExportSQL("x.xlsx", "xlsx"); err == nil {
+		t.Error("unknown export format must fail")
+	}
+}
