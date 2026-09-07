@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -91,6 +92,7 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeFilter
 		m.filter.SetValue(m.spec.Filter)
 		m.filter.Focus()
+		m.filterPushed = false
 		return m, nil
 	case "u":
 		return m.undo()
@@ -125,8 +127,16 @@ func pad(s string, w int) string {
 func (m Model) topRow() int {
 	bh := m.bodyHeight()
 	top := m.cursor - bh/2
-	if top < 0 {
-		top = 0
+	lo := m.blockOff
+	hi := m.blockOff + len(m.rows) - bh
+	if hi < lo {
+		hi = lo
+	}
+	if top < lo {
+		top = lo
+	}
+	if top > hi {
+		top = hi
 	}
 	return top
 }
@@ -174,12 +184,17 @@ func (m Model) renderTitle() string {
 	if m.counted {
 		rows = strconv.FormatInt(m.total, 10) + " rows"
 	}
-	return m.styles.Title.Render("pivotlens │ " + m.sess.Path + " │ " + rows)
+	title := "pivotlens │ " + filepath.ToSlash(m.sess.Path) + " │ " + rows
+	return m.styles.Title.Render(pad(title, m.w))
 }
 
 func (m Model) renderStatus() string {
 	if m.errText != "" {
-		return m.styles.ErrorBar.Render("error: " + m.errText)
+		msg := m.errText
+		if i := strings.IndexByte(msg, '\n'); i >= 0 {
+			msg = msg[:i]
+		}
+		return m.styles.ErrorBar.Render(pad("error: "+msg, m.w))
 	}
 	parts := []string{"row " + strconv.Itoa(m.cursor+1)}
 	if m.spec.Filter != "" {
@@ -193,7 +208,7 @@ func (m Model) renderStatus() string {
 		parts = append(parts, "sort: "+m.spec.Sort[0].Col+" "+d)
 	}
 	parts = append(parts, "[/] filter  [s] sort  [u] undo  [q] quit")
-	return m.styles.Status.Render(strings.Join(parts, "  │  "))
+	return m.styles.Status.Render(pad(strings.Join(parts, "  │  "), m.w))
 }
 
 func (m Model) View() tea.View {

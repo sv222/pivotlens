@@ -9,7 +9,10 @@ func (m Model) applyFilter() (tea.Model, tea.Cmd) {
 	if v == m.spec.Filter {
 		return m, nil
 	}
-	m = m.push()
+	if !m.filterPushed {
+		m = m.push()
+		m.filterPushed = true
+	}
 	m.spec.Filter = v
 	return m.reload()
 }

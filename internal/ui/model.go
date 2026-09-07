@@ -44,6 +44,8 @@ type Model struct {
 	pageReq reqID
 	keySeq  reqID
 
+	filterPushed bool
+
 	ctx     context.Context
 	cancel  context.CancelFunc
 	errText string

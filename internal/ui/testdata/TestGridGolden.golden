@@ -1,4 +1,4 @@
-[1mpivotlens │ ..\..\testdata\tiny.csv │ 5 rows[m
+[1mpivotlens │ ../../testdata/tiny.csv │ 5 rows                                                           [m
 [1;4;4mr[m[1;4;4me[m[1;4;4mg[m[1;4;4mi[m[1;4;4mo[m[1;4;4mn[m[4m [m[4m [m[4m [m[1;4;4m│[m[4m [m[1;4;4ms[m[1;4;4mt[m[1;4;4ma[m[1;4;4mt[m[1;4;4mu[m[1;4;4ms[m[4m [m[4m [m[4m [m[4m [m[1;4;4m│[m[4m [m[1;4;4ma[m[1;4;4mm[m[1;4;4mo[m[1;4;4mu[m[1;4;4mn[m[1;4;4mt[m[4m [m[1;4;4m│[m[4m [m[1;4;4mc[m[1;4;4mr[m[1;4;4me[m[1;4;4ma[m[1;4;4mt[m[1;4;4me[m[1;4;4md[m[1;4;4m_[m[1;4;4ma[m[1;4;4mt[m[4m [m[4m [m[4m [m[4m [m[4m [m[4m [m[4m [m[4m [m[4m [m
 [7mUS-EAST  │ COMPLETED │ 1420.5 │ 2026-09-01 14:02:11[m
 EU-CENT  │ FAILED    │ 84     │ 2026-09-01 14:02:15
@@ -10,4 +10,4 @@ EU-CENT  │ COMPLETED │ 12.5   │ 2026-09-01 14:03:45
 
 
 
-[2mrow 1  │  [/] filter  [s] sort  [u] undo  [q] quit[m
+[2mrow 1  │  [/] filter  [s] sort  [u] undo  [q] quit                                                  [m
