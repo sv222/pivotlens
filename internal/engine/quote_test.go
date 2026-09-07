@@ -8,6 +8,9 @@ func TestQuoteIdentifier(t *testing.T) {
 		`we"ird`:     `"we""ird"`,
 		"a b":        `"a b"`,
 		`"; DROP --`: `"""; DROP --"`,
+		"":           `""`,
+		`"`:          `""""`,
+		`""""`:       `""""""""""`,
 	}
 	for in, want := range cases {
 		if got := qi(in); got != want {
@@ -21,6 +24,9 @@ func TestQuoteLiteral(t *testing.T) {
 		"plain":    `'plain'`,
 		"it's":     `'it''s'`,
 		"'; DROP ": `'''; DROP '`,
+		"":         `''`,
+		`'`:        `''''`,
+		`''''`:     `''''''''''`,
 	}
 	for in, want := range cases {
 		if got := ql(in); got != want {
