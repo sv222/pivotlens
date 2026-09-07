@@ -39,3 +39,30 @@ func (q QuerySpec) selectList() (string, error) {
 	}
 	return strings.Join(parts, ", "), nil
 }
+
+func (q QuerySpec) baseWhere() string {
+	if len(q.DropNull) == 0 {
+		return ""
+	}
+	preds := make([]string, len(q.DropNull))
+	for i, c := range q.DropNull {
+		preds[i] = qi(c) + " IS NOT NULL"
+	}
+	return " WHERE " + strings.Join(preds, " AND ")
+}
+
+func (q QuerySpec) filterWhere() string {
+	if q.Filter == "" {
+		return ""
+	}
+	vis := q.Visible()
+	if len(vis) == 0 {
+		return ""
+	}
+	pat := ql("%" + likeEscape(q.Filter) + "%")
+	preds := make([]string, len(vis))
+	for i, c := range vis {
+		preds[i] = "coalesce(CAST(" + qi(c.Display()) + " AS VARCHAR), '') ILIKE " + pat + ` ESCAPE '\'`
+	}
+	return " WHERE (" + strings.Join(preds, " OR ") + ")"
+}

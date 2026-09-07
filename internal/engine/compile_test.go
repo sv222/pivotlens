@@ -92,3 +92,54 @@ func TestCloneIsDeep(t *testing.T) {
 		t.Error("Pivot.Rows aliased with original")
 	}
 }
+
+func TestBaseWhereEmpty(t *testing.T) {
+	if got := demoSpec().baseWhere(); got != "" {
+		t.Errorf("got %q, want empty", got)
+	}
+}
+
+func TestBaseWhereDropNull(t *testing.T) {
+	q := demoSpec()
+	q.DropNull = []string{"region", "amount"}
+	want := ` WHERE "region" IS NOT NULL AND "amount" IS NOT NULL`
+	if got := q.baseWhere(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFilterWhereEmpty(t *testing.T) {
+	if got := demoSpec().filterWhere(); got != "" {
+		t.Errorf("got %q, want empty", got)
+	}
+}
+
+func TestFilterWhereOrChain(t *testing.T) {
+	q := demoSpec()
+	q.Filter = "US"
+	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%US%' ESCAPE '\'` +
+		` OR coalesce(CAST("amount" AS VARCHAR), '') ILIKE '%US%' ESCAPE '\')`
+	if got := q.filterWhere(); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestFilterWhereEscapesWildcards(t *testing.T) {
+	q := demoSpec()
+	q.Cols[1].Hidden = true
+	q.Filter = "50%"
+	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%50\%%' ESCAPE '\')`
+	if got := q.filterWhere(); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestFilterWhereEscapesQuote(t *testing.T) {
+	q := demoSpec()
+	q.Cols[1].Hidden = true
+	q.Filter = "it's"
+	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%it''s%' ESCAPE '\')`
+	if got := q.filterWhere(); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
