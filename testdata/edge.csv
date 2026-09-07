@@ -1,0 +1,6 @@
+id,label,note,amount
+1,"Ünicode ✓",plain,10.5
+2,,"has ""quotes"" inside",
+3,"line
+break","tab	inside",0
+4,"very-long-value-that-exceeds-forty-characters-for-truncation-testing",x,-3.25
