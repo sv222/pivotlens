@@ -1,4 +1,4 @@
-# pivotlens
+# PivotLens
 
 Browse, sort and filter CSV, Parquet and NDJSON files in the terminal.
 
