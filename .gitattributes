@@ -1,0 +1,12 @@
+# Keep the repository LF-only in the working copy, not just in the index.
+# Git for Windows defaults to core.autocrlf=true, which rewrites a checkout to
+# CRLF. That checkout still tests green on Windows, but fails the moment it is
+# built somewhere else from the same files - a bind-mounted container, WSL, or
+# an archive of the working tree - because the golden comparison only undoes
+# CRLF when the test process itself runs on Windows.
+* text=auto eol=lf
+
+# Golden files are raw terminal output: escape sequences, control codes and
+# carriage returns that carry meaning. They must round-trip byte for byte, so
+# exempt them from conversion entirely rather than relying on eol=lf.
+*.golden -text
