@@ -1,0 +1,55 @@
+name: Set up the cgo toolchain
+description: >-
+  Installs a pinned mingw-w64 gcc on Windows and exports it as CC. No-op on
+  Linux and macOS, which build with the system compiler.
+
+# go-duckdb's prebuilt windows-amd64 library is compiled with emulated TLS.
+# A native-TLS gcc cannot link it: `undefined reference to __emutls_v...`.
+# MSYS2's ucrt64 package is rolling and now ships gcc 16.x, which fails that
+# way, so the toolchain is pinned to an immutable winlibs release instead of
+# installed from a rolling repo. See docs/design/pivotlens-design.md section
+# 10.1. Bump the three pinned values together.
+
+runs:
+  using: composite
+  steps:
+    - name: Cache the pinned mingw-w64 toolchain
+      if: runner.os == 'Windows'
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: C:\winlibs
+        key: winlibs-gcc-15.2.0-ucrt-r7
+
+    - name: Download the pinned mingw-w64 gcc
+      if: runner.os == 'Windows' && steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        $url = 'https://github.com/brechtsanders/winlibs_mingw/releases/download/15.2.0posix-14.0.0-ucrt-r7/winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-14.0.0-r7.7z'
+        $want = 'a914feafd7462126637d4b8196a31f3fb856ad929768ceb092c99969b43675b3'
+        $archive = Join-Path $env:RUNNER_TEMP 'winlibs.7z'
+        Invoke-WebRequest -Uri $url -OutFile $archive
+        $got = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+        if ($got -ne $want) {
+          Write-Error "winlibs checksum mismatch: got $got, want $want"
+          exit 1
+        }
+        7z x $archive -oC:\winlibs -y | Out-Null
+
+    - name: Select the pinned gcc
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $gcc = Get-ChildItem -Path C:\winlibs -Recurse -Filter gcc.exe | Select-Object -First 1
+        if (-not $gcc) {
+          Write-Error 'gcc.exe not found under C:\winlibs'
+          exit 1
+        }
+        $ver = & $gcc.FullName -dumpversion
+        Write-Host "using gcc $ver at $($gcc.FullName)"
+        if ([int](($ver -split '\.')[0]) -ge 16) {
+          Write-Error "gcc $ver is too new; go-duckdb's prebuilt windows library needs 15.x or older"
+          exit 1
+        }
+        "CC=$($gcc.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        $gcc.Directory.FullName | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8

@@ -12,6 +12,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CGO_ENABLED: "1"
+
 jobs:
   build:
     strategy:
@@ -25,36 +28,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # go-duckdb needs cgo. Its prebuilt windows-amd64 library is built
-      # with emulated TLS; a native-TLS gcc (16.x on MSYS2's ucrt64 as of
-      # this workflow) fails to link it with `undefined reference to
-      # __emutls_v...`. See docs/design/pivotlens-design.md section 10.1.
-      - name: Install mingw-w64 gcc (Windows)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
-        with:
-          msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc
-      - name: Check the mingw gcc major version (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          ver=$(gcc -dumpversion)
-          echo "mingw gcc version: $ver"
-          major=${ver%%.*}
-          if [ "$major" -ge 16 ]; then
-            echo "::error::MSYS2 ucrt64 gcc is $ver. go-duckdb's prebuilt windows library needs gcc 15.x or older (see docs/design/pivotlens-design.md section 10.1). Pin an older toolchain explicitly instead of mingw-w64-ucrt-x86_64-gcc."
-            exit 1
-          fi
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        env:
-          CGO_ENABLED: 1
-          CC: gcc
-        run: go build ./...
+      - uses: ./.github/actions/setup-cgo-toolchain
       - name: Build
-        if: runner.os != 'Windows'
         run: go build ./...
 
   test:
@@ -69,31 +44,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install mingw-w64 gcc (Windows)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
-        with:
-          msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc
-      - name: Check the mingw gcc major version (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          ver=$(gcc -dumpversion)
-          major=${ver%%.*}
-          if [ "$major" -ge 16 ]; then
-            echo "::error::MSYS2 ucrt64 gcc is $ver, needs to be 15.x or older. See docs/design/pivotlens-design.md section 10.1."
-            exit 1
-          fi
-      - name: Test (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        env:
-          CGO_ENABLED: 1
-          CC: gcc
-        run: go test ./... -race
+      - uses: ./.github/actions/setup-cgo-toolchain
       - name: Test
-        if: runner.os != 'Windows'
         run: go test ./... -race
 
   lint:
