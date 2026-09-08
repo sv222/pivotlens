@@ -4,17 +4,9 @@ A command-line viewer for CSV, Parquet and NDJSON files. Browse, sort and
 filter millions of rows in the terminal, no SQL required.
 
 [![ci](https://github.com/sv222/pivotlens/actions/workflows/ci.yml/badge.svg)](https://github.com/sv222/pivotlens/actions/workflows/ci.yml)
-
-<!--
-Release, license and Go Reference badges removed for now: they resolve
-through shields.io and pkg.go.dev, both of which need public, unauthenticated
-access to the repo. They will just show "not found" or "repo not found"
-while this repo is private. Restore them once it goes public:
-
 [![release](https://img.shields.io/github/v/release/sv222/pivotlens)](https://github.com/sv222/pivotlens/releases)
 [![license](https://img.shields.io/github/license/sv222/pivotlens)](LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/sv222/pivotlens.svg)](https://pkg.go.dev/github.com/sv222/pivotlens)
--->
 
 ## What it is
 
