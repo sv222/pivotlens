@@ -1,6 +1,7 @@
 # PivotLens
 
-Browse, sort and filter CSV, Parquet and NDJSON files in the terminal.
+A command-line viewer for CSV, Parquet and NDJSON files. Browse, sort and
+filter millions of rows in the terminal, no SQL required.
 
 [![ci](https://github.com/sv222/pivotlens/actions/workflows/ci.yml/badge.svg)](https://github.com/sv222/pivotlens/actions/workflows/ci.yml)
 
@@ -17,11 +18,12 @@ while this repo is private. Restore them once it goes public:
 
 ## What it is
 
-pivotlens is an interactive terminal grid for CSV, Parquet and NDJSON files,
-backed by an embedded DuckDB. It is for anyone who needs to check a data
-file - a Data engineer, an analyst, a backend developer looking at a log
-export - without opening a spreadsheet or writing a script. Point it at a
-file and you get a scrollable grid with sort and filter, no SQL required.
+pivotlens is an open source CSV, Parquet and NDJSON viewer for the terminal:
+an interactive grid backed by an embedded DuckDB. It is for anyone who needs
+to check a data file - a data engineer, an analyst, a backend developer
+looking at a log export - without opening a spreadsheet or writing a script.
+Point it at a file and you get a scrollable grid with sort and filter over
+millions of rows, no SQL required.
 
 It is early. Opening a file, scrolling, sorting and filtering all work
 today. A pivot-table builder and a column manager are planned but not
@@ -29,12 +31,12 @@ built yet, so the name is ahead of the tool for now.
 
 ## The problem
 
-A CSV that is a few hundred MB opens slowly in a spreadsheet, if it opens
-at all. Excel caps a worksheet at 1,048,576 rows; past that, extra rows
-are silently dropped. A Parquet or NDJSON file cannot be opened in a
-spreadsheet at all without converting it first. The usual fallback is a
-disposable Python script or a raw `duckdb` SQL shell, just to see what is
-in the file.
+A CSV that is a few hundred MB opens slowly in a spreadsheet, if it opens at
+all, and a multi-gigabyte one will not open. Excel caps a worksheet at
+1,048,576 rows; past that, extra rows are silently dropped. A Parquet or
+NDJSON file cannot be opened in a spreadsheet at all without converting it
+first. The usual fallback is a disposable Python script or a raw `duckdb`
+SQL shell, just to see what is in the file.
 
 ## Install
 
@@ -43,9 +45,10 @@ go install github.com/sv222/pivotlens@latest
 ```
 
 Requires Go and, because `pivotlens` embeds DuckDB through cgo, a C compiler
-on `PATH`. Prebuilt binaries for Linux, macOS and Windows will be attached
-to each tagged release on the [Releases page](https://github.com/sv222/pivotlens/releases)
-once the first one is cut.
+on `PATH`. To skip both, download a prebuilt binary from the
+[Releases page](https://github.com/sv222/pivotlens/releases) instead: every
+tagged release ships Linux and macOS builds for amd64 and arm64, a Windows
+amd64 build, and a `checksums.txt` covering all of them.
 
 Build from source:
 
@@ -130,6 +133,10 @@ a fast keystroke never lets a slow, stale query overwrite a newer one.
 
 ## Comparison
 
+If you know `less`, the idea is the same - page through a file in place,
+without loading or converting it first - except the unit is a row and a
+column rather than a line, and you get sort and filter with it.
+
 | Tool | Interactive TUI | Multi-GB files | No SQL needed | Formats |
 |---|---|---|---|---|
 | Excel / Google Sheets | yes | no, 1,048,576-row cap | yes | spreadsheet formats, csv |
@@ -162,6 +169,16 @@ by an embedded DuckDB instead of an in-process CSV parser. Unlike
 **How do I sort or filter a CSV without opening a spreadsheet?**
 Press `s` to sort the current column, or `/` to type a filter. Both apply
 instantly and can be undone with `u`.
+
+**How do I inspect NDJSON or JSON Lines logs from the command line?**
+`pivotlens yourlogs.ndjson` reads the file as a table, one row per line, so
+you can sort by timestamp or filter down to a single request id without
+piping it through `jq`. Compressed `.gz` and `.zst` logs open the same way.
+
+**Is there a CSV and Parquet viewer for the Windows terminal?**
+Yes. `pivotlens` is a single binary and behaves the same on Windows, Linux
+and macOS. Download the Windows build from the Releases page; nothing else
+needs installing, because DuckDB is embedded in the binary.
 
 ## Contributing and license
 
