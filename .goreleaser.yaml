@@ -1,0 +1,41 @@
+version: 2
+
+project_name: pivotlens
+
+builds:
+  - id: pivotlens
+    binary: pivotlens
+    main: .
+    env:
+      - CGO_ENABLED=1
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      # no windows/arm64 GitHub-hosted runner to build this natively on;
+      # see docs/design/pivotlens-design.md section 10.2
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: pivotlens
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  # .github/workflows/release.yml runs `goreleaser build --single-target`
+  # on one native runner per platform (linux, windows and darwin all need
+  # go-duckdb's own cgo toolchain; cross-compilation was rejected, see
+  # docs/design/pivotlens-design.md section 10.2) and publishes the merged
+  # result itself via softprops/action-gh-release. GoReleaser's own
+  # `release` command, and its native split/merge across runners, are not
+  # used - the multi-runner merge is a GoReleaser Pro feature.
+  disable: true
