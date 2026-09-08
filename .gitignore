@@ -3,3 +3,7 @@ temp/
 *.exe
 testdata/big/
 .worktrees/
+
+# local planning and pitch docs, not for publication
+idea1.md
+docs/superpowers/
