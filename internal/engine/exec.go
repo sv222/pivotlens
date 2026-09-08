@@ -17,7 +17,7 @@ func (s *Session) FetchPage(ctx context.Context, q QuerySpec, limit, offset int)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, nil, err

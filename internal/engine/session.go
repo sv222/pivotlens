@@ -29,7 +29,7 @@ func Open(ctx context.Context, path string) (*Session, error) {
 	}
 	tmp := filepath.Join(os.TempDir(), "pivotlens")
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	threads := runtime.NumCPU()
@@ -42,17 +42,17 @@ func Open(ctx context.Context, path string) (*Session, error) {
 	}
 	for _, p := range pragmas {
 		if _, err := db.ExecContext(ctx, p); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("pragma %q: %w", p, err)
 		}
 	}
 	if _, err := db.ExecContext(ctx, "CREATE VIEW src AS SELECT * FROM "+scan); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("read source: %w", err)
 	}
 	s := &Session{db: db, Path: path}
 	if err := s.describe(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return s, nil
@@ -63,7 +63,7 @@ func (s *Session) describe(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("describe: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	names, err := rows.Columns()
 	if err != nil {
 		return err

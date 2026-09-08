@@ -14,7 +14,7 @@ func testSession(t *testing.T) *engine.Session {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 

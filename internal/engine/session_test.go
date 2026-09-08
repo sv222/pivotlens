@@ -16,7 +16,7 @@ func openFixture(t *testing.T, name string) *Session {
 	if err != nil {
 		t.Fatalf("Open(%s): %v", name, err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 

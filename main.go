@@ -41,7 +41,7 @@ func run(path string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 	_, err = tea.NewProgram(ui.New(sess)).Run()
 	return err
 }
