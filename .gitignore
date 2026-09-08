@@ -6,4 +6,5 @@ testdata/big/
 
 # local planning and pitch docs, not for publication
 idea1.md
-docs/superpowers/
+
+# other local-only tool ignores live in .git/info/exclude, not here
