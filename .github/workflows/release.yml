@@ -9,14 +9,21 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
-# go-duckdb needs cgo, and cross-compilation was rejected (see
-# docs/design/pivotlens-design.md section 10.2), so each platform is built on
-# its own native runner with `goreleaser build --single-target`, not with a
-# single `goreleaser release` call. Merging build artifacts from several
-# native runners into one release is a GoReleaser Pro feature; the publish
-# job below does that part by hand instead.
+env:
+  CGO_ENABLED: "1"
+
+# go-duckdb needs cgo and cross-compilation was rejected (see
+# docs/design/pivotlens-design.md section 10.2), so every platform builds on a
+# native runner. goreleaser is not used: merging per-runner builds into one
+# release is a Pro feature, `release` has no --single-target, and `build`
+# emits bare binaries rather than archives. The publish job below packages
+# and checksums them instead.
+#
+# darwin/amd64 is the one exception to "native": the macos-13 Intel runner is
+# effectively unavailable now, so it is cross-built from the arm64 runner with
+# clang's own -arch flag, against go-duckdb's prebuilt darwin-amd64 library.
 jobs:
   build:
     strategy:
@@ -32,7 +39,7 @@ jobs:
           - os: macos-latest
             goos: darwin
             goarch: arm64
-          - os: macos-13
+          - os: macos-latest
             goos: darwin
             goarch: amd64
           - os: windows-latest
@@ -41,54 +48,32 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Install mingw-w64 gcc (Windows)
-        if: matrix.goos == 'windows'
-        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
-        with:
-          msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc
-      - name: Check the mingw gcc major version (Windows)
-        if: matrix.goos == 'windows'
-        shell: msys2 {0}
-        run: |
-          ver=$(gcc -dumpversion)
-          major=${ver%%.*}
-          if [ "$major" -ge 16 ]; then
-            echo "::error::MSYS2 ucrt64 gcc is $ver, needs to be 15.x or older. See docs/design/pivotlens-design.md section 10.1."
-            exit 1
-          fi
-      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        with:
-          install-only: true
-          version: latest
-      - name: Build (Windows)
-        if: matrix.goos == 'windows'
-        shell: msys2 {0}
-        env:
-          CGO_ENABLED: 1
-          CC: gcc
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: goreleaser build --single-target --clean
+          cache: true
+      - uses: ./.github/actions/setup-cgo-toolchain
+      - name: Configure the macOS cross compiler
+        if: matrix.goos == 'darwin' && matrix.goarch == 'amd64'
+        run: echo 'CC=clang -arch x86_64' >> "$GITHUB_ENV"
       - name: Build
-        if: matrix.goos != 'windows'
+        shell: bash
         env:
-          CGO_ENABLED: 1
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: goreleaser build --single-target --clean
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          binary="pivotlens"
+          if [ "$GOOS" = "windows" ]; then binary="pivotlens.exe"; fi
+          mkdir -p out
+          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "out/${binary}" .
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: pivotlens_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: |
-            dist/*.tar.gz
-            dist/*.zip
+          name: bin_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: out/*
           retention-days: 1
+          if-no-files-found: error
 
   publish:
     needs: build
@@ -96,11 +81,24 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: dist
-          merge-multiple: true
-      - name: Generate checksums
-        working-directory: dist
-        run: sha256sum * > checksums.txt
+          path: staging
+      - name: Package the binaries
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          for dir in staging/bin_*/; do
+            platform="$(basename "$dir")"
+            platform="${platform#bin_}"
+            if [ -f "${dir}pivotlens.exe" ]; then
+              (cd "$dir" && zip -q "${GITHUB_WORKSPACE}/dist/pivotlens_${version}_${platform}.zip" pivotlens.exe)
+            else
+              chmod +x "${dir}pivotlens"
+              tar -czf "dist/pivotlens_${version}_${platform}.tar.gz" -C "$dir" pivotlens
+            fi
+          done
+          (cd dist && sha256sum pivotlens_* > checksums.txt)
+          ls -l dist
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/*
