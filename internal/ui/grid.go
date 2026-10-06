@@ -90,6 +90,9 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.panel = newFilterPanel(m.spec.Clone())
 		return m, nil
+	case "c":
+		m.panel = newColumnsPanel(m.spec.Clone())
+		return m, nil
 	case "u":
 		return m.undo()
 	}
