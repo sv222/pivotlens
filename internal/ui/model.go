@@ -34,13 +34,15 @@ type Model struct {
 	total   int64
 	counted bool
 
-	specReq reqID
-	pageReq reqID
-	keySeq  reqID
+	specReq   reqID
+	pageReq   reqID
+	keySeq    reqID
+	exportReq reqID
 
 	ctx     context.Context
 	cancel  context.CancelFunc
 	errText string
+	notice  string
 }
 
 func New(s *engine.Session) Model {
@@ -88,6 +90,7 @@ func (m Model) reload() (tea.Model, tea.Cmd) {
 	m.specReq++
 	m.pageReq++
 	m.counted = false
+	m.notice = ""
 	m.cursor, m.colStart, m.blockOff = 0, 0, 0
 	m.headers = displayNames(m.spec)
 	return m, tea.Batch(
@@ -164,6 +167,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.spec = pending
 		return m.reload()
+
+	case exportMsg:
+		if msg.id != m.exportReq {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.errText = msg.err.Error()
+			return m, nil
+		}
+		m.panel = nil
+		m.errText = ""
+		m.notice = "wrote " + msg.path
+		return m, nil
 
 	case tea.KeyPressMsg:
 		if m.panel != nil {

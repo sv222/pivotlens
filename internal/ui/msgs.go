@@ -34,6 +34,18 @@ type widthsMsg struct {
 
 type debounceMsg struct{ id reqID }
 
+type exportMsg struct {
+	id   reqID
+	path string
+	err  error
+}
+
+func exportCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, path, format string, id reqID) tea.Cmd {
+	return func() tea.Msg {
+		return exportMsg{id: id, path: path, err: s.Export(ctx, q, path, format)}
+	}
+}
+
 func fetchPageCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, id reqID, limit, offset int) tea.Cmd {
 	return func() tea.Msg {
 		rows, cols, err := s.FetchPage(ctx, q, limit, offset)

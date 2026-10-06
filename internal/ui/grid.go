@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -92,6 +93,18 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "c":
 		m.panel = newColumnsPanel(m.spec.Clone())
+		return m, nil
+	case "e":
+		m.exportReq++
+		id := m.exportReq
+		spec := m.spec.Clone()
+		m.panel = newExportPanel(spec, func(q engine.QuerySpec, path string) tea.Cmd {
+			format, ok := exportFormat(path)
+			if !ok {
+				return nil
+			}
+			return exportCmd(context.Background(), m.sess, q, path, format, id)
+		})
 		return m, nil
 	case "u":
 		return m.undo()
@@ -205,6 +218,9 @@ func (m Model) renderStatus() string {
 			d = "desc"
 		}
 		parts = append(parts, "sort: "+m.spec.Sort[0].Col+" "+d)
+	}
+	if m.notice != "" {
+		parts = append(parts, m.notice)
 	}
 	parts = append(parts, "[/] filter  [s] sort  [u] undo  [q] quit")
 	return m.styles.Status.Render(pad(strings.Join(parts, "  │  "), m.w))
