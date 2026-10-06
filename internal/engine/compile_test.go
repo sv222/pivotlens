@@ -109,7 +109,8 @@ func TestBaseWhereDropNull(t *testing.T) {
 }
 
 func TestFilterWhereEmpty(t *testing.T) {
-	if got := demoSpec().filterWhere(); got != "" {
+	got, err := demoSpec().filterWhere()
+	if got != "" || err != nil {
 		t.Errorf("got %q, want empty", got)
 	}
 }
@@ -119,7 +120,11 @@ func TestFilterWhereOrChain(t *testing.T) {
 	q.Filter = "US"
 	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%US%' ESCAPE '\'` +
 		` OR coalesce(CAST("amount" AS VARCHAR), '') ILIKE '%US%' ESCAPE '\')`
-	if got := q.filterWhere(); got != want {
+	got, err := q.filterWhere()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
@@ -129,7 +134,11 @@ func TestFilterWhereEscapesWildcards(t *testing.T) {
 	q.Cols[1].Hidden = true
 	q.Filter = "50%"
 	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%50\%%' ESCAPE '\')`
-	if got := q.filterWhere(); got != want {
+	got, err := q.filterWhere()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
@@ -139,7 +148,11 @@ func TestFilterWhereEscapesQuote(t *testing.T) {
 	q.Cols[1].Hidden = true
 	q.Filter = "it's"
 	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%it''s%' ESCAPE '\')`
-	if got := q.filterWhere(); got != want {
+	got, err := q.filterWhere()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }

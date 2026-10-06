@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -18,6 +19,10 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 func likeEscape(s string) string {
 	return likeEscaper.Replace(s)
 }
+
+var typeRe = regexp.MustCompile(`^[A-Z][A-Z0-9(), ]*$`)
+
+func validType(t string) bool { return typeRe.MatchString(t) }
 
 var castTypes = map[string]bool{
 	"VARCHAR":       true,

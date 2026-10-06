@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -52,7 +53,7 @@ func (q QuerySpec) baseWhere() string {
 	return " WHERE " + strings.Join(preds, " AND ")
 }
 
-func (q QuerySpec) filterWhere() string {
+func (q QuerySpec) substringWhere() string {
 	if q.Filter == "" {
 		return ""
 	}
@@ -65,7 +66,55 @@ func (q QuerySpec) filterWhere() string {
 	for i, c := range vis {
 		preds[i] = "coalesce(CAST(" + qi(c.Display()) + " AS VARCHAR), '') ILIKE " + pat + ` ESCAPE '\'`
 	}
-	return " WHERE (" + strings.Join(preds, " OR ") + ")"
+	return strings.Join(preds, " OR ")
+}
+
+func (q QuerySpec) filterWhere() (string, error) {
+	var preds []string
+	if sub := q.substringWhere(); sub != "" {
+		preds = append(preds, "("+sub+")")
+	}
+	for _, f := range q.Filters {
+		p, err := f.pred()
+		if err != nil {
+			return "", err
+		}
+		preds = append(preds, p)
+	}
+	if len(preds) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(preds, " AND "), nil
+}
+
+func (f FilterSpec) pred() (string, error) {
+	col := qi(f.Col)
+	switch f.Op {
+	case OpNull:
+		return col + " IS NULL", nil
+	case OpNotNull:
+		return col + " IS NOT NULL", nil
+	case OpContains, OpStarts, OpEnds:
+		e := likeEscape(f.Value)
+		var pat string
+		switch f.Op {
+		case OpContains:
+			pat = "%" + e + "%"
+		case OpStarts:
+			pat = e + "%"
+		default:
+			pat = "%" + e
+		}
+		return "CAST(" + col + " AS VARCHAR) ILIKE " + ql(pat) + ` ESCAPE '\'`, nil
+	}
+	t := f.ColType
+	if t == "" {
+		t = "VARCHAR"
+	}
+	if !validType(t) {
+		return "", fmt.Errorf("unsupported column type %q", t)
+	}
+	return "CAST(" + col + " AS " + t + ") " + f.Op.String() + " CAST(" + ql(f.Value) + " AS " + t + ")", nil
 }
 
 var ErrPivotWidths = errors.New("pivot widths must be measured from results")
@@ -75,8 +124,12 @@ func (q QuerySpec) prefix() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fw, err := q.filterWhere()
+	if err != nil {
+		return "", err
+	}
 	return "WITH base AS (SELECT " + sel + " FROM src" + q.baseWhere() + "), " +
-		"filtered AS (SELECT * FROM base" + q.filterWhere() + ") ", nil
+		"filtered AS (SELECT * FROM base" + fw + ") ", nil
 }
 
 func (q QuerySpec) orderBy() string {

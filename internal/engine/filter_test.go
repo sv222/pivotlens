@@ -57,3 +57,102 @@ func TestCloneCopiesFilters(t *testing.T) {
 		t.Error("Clone shares the Filters slice")
 	}
 }
+
+func TestPredGolden(t *testing.T) {
+	cases := []struct {
+		name string
+		f    FilterSpec
+		want string
+	}{
+		{"eq numeric", FilterSpec{Col: "amount", Op: OpEq, Value: "84", ColType: "DOUBLE"},
+			`CAST("amount" AS DOUBLE) = CAST('84' AS DOUBLE)`},
+		{"ge date", FilterSpec{Col: "created_at", Op: OpGe, Value: "2026-09-01", ColType: "TIMESTAMP"},
+			`CAST("created_at" AS TIMESTAMP) >= CAST('2026-09-01' AS TIMESTAMP)`},
+		{"eq empty coltype falls back to varchar", FilterSpec{Col: "status", Op: OpEq, Value: "FAILED"},
+			`CAST("status" AS VARCHAR) = CAST('FAILED' AS VARCHAR)`},
+		{"contains escaped", FilterSpec{Col: "status", Op: OpContains, Value: `50%\_`},
+			`CAST("status" AS VARCHAR) ILIKE '%50\%\\\_%' ESCAPE '\'`},
+		{"starts", FilterSpec{Col: "region", Op: OpStarts, Value: "US"},
+			`CAST("region" AS VARCHAR) ILIKE 'US%' ESCAPE '\'`},
+		{"ends quote escaped", FilterSpec{Col: "name", Op: OpEnds, Value: "o'brien"},
+			`CAST("name" AS VARCHAR) ILIKE '%o''brien' ESCAPE '\'`},
+		{"null", FilterSpec{Col: "amount", Op: OpNull}, `"amount" IS NULL`},
+		{"not null", FilterSpec{Col: "amount", Op: OpNotNull}, `"amount" IS NOT NULL`},
+	}
+	for _, c := range cases {
+		got, err := c.f.pred()
+		if err != nil {
+			t.Fatalf("%s: pred error: %v", c.name, err)
+		}
+		if got != c.want {
+			t.Errorf("%s:\n got %s\nwant %s", c.name, got, c.want)
+		}
+	}
+}
+
+func TestPredRejectsBadColType(t *testing.T) {
+	f := FilterSpec{Col: "a", Op: OpGt, Value: "1", ColType: `DOUBLE); DROP TABLE src`}
+	if _, err := f.pred(); err == nil {
+		t.Fatal("bad ColType accepted")
+	}
+	q := NewSpec([]ColumnMeta{{Name: "a", Type: "DOUBLE"}})
+	q.Filters = []FilterSpec{f}
+	if _, err := q.PageSQL(10, 0); err == nil {
+		t.Fatal("bad ColType not surfaced through PageSQL")
+	}
+}
+
+func fixtureSpec() QuerySpec {
+	return NewSpec([]ColumnMeta{
+		{Name: "region", Type: "VARCHAR"},
+		{Name: "status", Type: "VARCHAR"},
+	})
+}
+
+func TestFilterWhereCombinesSubstringAndTyped(t *testing.T) {
+	q := fixtureSpec()
+	q.Filter = "EAST"
+	q.Filters = []FilterSpec{{Col: "status", Op: OpEq, Value: "FAILED", ColType: "VARCHAR"}}
+	got, err := q.filterWhere()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%EAST%' ESCAPE '\' OR coalesce(CAST("status" AS VARCHAR), '') ILIKE '%EAST%' ESCAPE '\') AND CAST("status" AS VARCHAR) = CAST('FAILED' AS VARCHAR)`
+	if got != want {
+		t.Errorf("\n got %s\nwant %s", got, want)
+	}
+}
+
+func TestFilterWhereTypedOnlyAndUnchanged(t *testing.T) {
+	q := fixtureSpec()
+	q.Filters = []FilterSpec{{Col: "status", Op: OpNe, Value: "FAILED", ColType: "VARCHAR"}}
+	got, err := q.filterWhere()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := ` WHERE CAST("status" AS VARCHAR) != CAST('FAILED' AS VARCHAR)`; got != want {
+		t.Errorf("typed only:\n got %s\nwant %s", got, want)
+	}
+	r := fixtureSpec()
+	r.Filter = "EAST"
+	got, err = r.filterWhere()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := ` WHERE (coalesce(CAST("region" AS VARCHAR), '') ILIKE '%EAST%' ESCAPE '\' OR coalesce(CAST("status" AS VARCHAR), '') ILIKE '%EAST%' ESCAPE '\')`; got != want {
+		t.Errorf("substring only changed shape:\n got %s\nwant %s", got, want)
+	}
+}
+
+func TestValidType(t *testing.T) {
+	for _, ok := range []string{"DOUBLE", "DECIMAL(18,2)", "TIMESTAMP WITH TIME ZONE", "BIGINT"} {
+		if !validType(ok) {
+			t.Errorf("%q should be valid", ok)
+		}
+	}
+	for _, bad := range []string{"", `DOUBLE); DROP`, "double", "VARCHAR'"} {
+		if validType(bad) {
+			t.Errorf("%q should be invalid", bad)
+		}
+	}
+}
