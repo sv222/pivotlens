@@ -2,8 +2,8 @@ package ui
 
 import (
 	"context"
+	"reflect"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/sv222/pivotlens/internal/engine"
@@ -11,20 +11,14 @@ import (
 
 const PageSize = 200
 
-type Mode int
-
-const (
-	ModeGrid Mode = iota
-	ModeSort
-	ModeFilter
-)
-
 type Model struct {
 	sess *engine.Session
 	spec engine.QuerySpec
 	hist []engine.QuerySpec
 
-	mode   Mode
+	panel   Panel
+	pending *engine.QuerySpec
+
 	w, h   int
 	styles Styles
 
@@ -44,20 +38,13 @@ type Model struct {
 	pageReq reqID
 	keySeq  reqID
 
-	filterPushed bool
-
 	ctx     context.Context
 	cancel  context.CancelFunc
 	errText string
-
-	sortIdx int
-	filter  textinput.Model
 }
 
 func New(s *engine.Session) Model {
 	q := engine.NewSpec(s.Columns())
-	ti := textinput.New()
-	ti.Prompt = "/"
 	ctx, cancel := context.WithCancel(context.Background())
 	m := Model{
 		sess:    s,
@@ -69,7 +56,6 @@ func New(s *engine.Session) Model {
 		pageReq: 1,
 		ctx:     ctx,
 		cancel:  cancel,
-		filter:  ti,
 	}
 	m.headers = displayNames(q)
 	m.widths = Fit(nil, m.headers)
@@ -168,20 +154,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case debounceMsg:
-		if msg.id != m.keySeq {
+		if msg.id != m.keySeq || m.pending == nil {
 			return m, nil
 		}
-		return m.applyFilter()
+		pending := *m.pending
+		m.pending = nil
+		if reflect.DeepEqual(m.spec, pending) {
+			return m, nil
+		}
+		m.spec = pending
+		return m.reload()
 
 	case tea.KeyPressMsg:
-		switch m.mode {
-		case ModeGrid:
-			return m.updateGrid(msg)
-		case ModeSort:
-			return m.updateSort(msg)
-		case ModeFilter:
-			return m.updateFilter(msg)
+		if m.panel != nil {
+			np, a := m.panel.Update(msg)
+			m.panel = np
+			return m.applyPanelAction(a)
 		}
+		return m.updateGrid(msg)
+	}
+
+	if m.panel != nil {
+		np, a := m.panel.Update(msg)
+		m.panel = np
+		return m.applyPanelAction(a)
 	}
 	return m, nil
 }

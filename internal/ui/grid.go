@@ -85,14 +85,10 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "s":
-		m.mode = ModeSort
-		m.sortIdx = m.colCursor
+		m.panel = newSortPanel(m.headers, m.colCursor, m.spec.Clone())
 		return m, nil
 	case "/":
-		m.mode = ModeFilter
-		m.filter.SetValue(m.spec.Filter)
-		m.filter.Focus()
-		m.filterPushed = false
+		m.panel = newFilterPanel(m.spec.Clone())
 		return m, nil
 	case "u":
 		return m.undo()
@@ -220,11 +216,8 @@ func (m Model) View() tea.View {
 	b.WriteString(m.renderBody())
 	b.WriteString("\n")
 	b.WriteString(m.renderStatus())
-	switch m.mode {
-	case ModeFilter:
-		b.WriteString("\n" + m.filter.View())
-	case ModeSort:
-		b.WriteString("\n" + m.sortView())
+	if m.panel != nil {
+		b.WriteString("\n" + m.panel.View(m.styles, m.w))
 	}
 	v := tea.NewView(b.String())
 	v.AltScreen = true
