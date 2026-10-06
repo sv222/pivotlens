@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="PivotLens logo" width="180">
+</p>
+
 # PivotLens
 
 A command-line viewer for CSV, Parquet and NDJSON files. Browse, sort and
