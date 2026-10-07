@@ -21,9 +21,9 @@ looking at a log export - without opening a spreadsheet or writing a script.
 Point it at a file and you get a scrollable grid with sort and filter over
 millions of rows, no SQL required.
 
-It is early. Opening a file, scrolling, sorting and filtering all work
-today. A pivot-table builder and a column manager are planned but not
-built yet, so the name is ahead of the tool for now.
+It is early. Opening a file, scrolling, sorting, filtering, column
+management and export all work today. A pivot-table builder is planned
+but not built yet, so the name is ahead of the tool for now.
 
 ## The problem
 
@@ -112,6 +112,9 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 | `/` | open the filter, `enter` applies it, `esc` cancels |
 | `s` | open sort on the current column, `a` ascending, `d` descending, `x` clears, `esc` cancels |
 | `u` | undo the last applied sort or filter |
+| `c` | manage columns: `space` hides, `J`/`K` reorder, `r` renames, `enter` applies, `esc` discards |
+| `e` | export the current view to a `.csv` or `.parquet` file |
+| `i` | show statistics for the current column over the filtered view |
 | `q`, `ctrl+c` | quit |
 
 ## How it works
