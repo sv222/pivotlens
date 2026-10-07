@@ -91,6 +91,22 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.panel = newFilterPanel(m.spec.Clone())
 		return m, nil
+	case "f", "F":
+		if m.spec.Pivot != nil {
+			m.errText = "filters are unavailable on a pivot view"
+			return m, nil
+		}
+		if msg.String() == "f" {
+			col := m.headers[m.colCursor]
+			ct := m.colType(col)
+			if ct == "" {
+				ct = "VARCHAR"
+			}
+			m.panel = newFilterTypedPanel(m.spec.Clone(), col, ct)
+		} else {
+			m.panel = newFiltersPanel(m.spec.Clone())
+		}
+		return m, nil
 	case "c":
 		m.panel = newColumnsPanel(m.spec.Clone())
 		return m, nil
@@ -132,6 +148,22 @@ func (m Model) metaName(display string) string {
 		}
 	}
 	return display
+}
+
+func (m Model) colType(display string) string {
+	name := display
+	for _, c := range m.spec.Cols {
+		if c.Display() == display {
+			name = c.Name
+			break
+		}
+	}
+	for _, c := range m.sess.Columns() {
+		if c.Name == name {
+			return c.Type
+		}
+	}
+	return ""
 }
 
 func pad(s string, w int) string {
@@ -233,6 +265,9 @@ func (m Model) renderStatus() string {
 	parts := []string{"row " + strconv.Itoa(m.cursor+1)}
 	if m.spec.Filter != "" {
 		parts = append(parts, "filter: "+m.spec.Filter)
+	}
+	for _, f := range m.spec.Filters {
+		parts = append(parts, f.String())
 	}
 	if len(m.spec.Sort) > 0 {
 		d := "asc"

@@ -1,11 +1,14 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
+
+	"github.com/sv222/pivotlens/internal/engine"
 )
 
 func TestStalePageMsgIsIgnored(t *testing.T) {
@@ -108,4 +111,46 @@ func TestGridGolden(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(5*time.Second))
 	final := tm.FinalModel(t).(Model)
 	teatest.RequireEqualOutput(t, []byte(final.View().Content))
+}
+
+func TestFOpenTypedPanel(t *testing.T) {
+	s := testSession(t)
+	m := New(s)
+	next, _ := m.Update(press("f"))
+	got := next.(Model)
+	if _, ok := got.panel.(*filterTypedPanel); !ok {
+		t.Fatalf("panel = %T, want *filterTypedPanel", got.panel)
+	}
+}
+
+func TestFOpenFiltersPanel(t *testing.T) {
+	s := testSession(t)
+	m := New(s)
+	next, _ := m.Update(press("F"))
+	got := next.(Model)
+	if _, ok := got.panel.(*filtersPanel); !ok {
+		t.Fatalf("panel = %T, want *filtersPanel", got.panel)
+	}
+}
+
+func TestFilterKeysRefusedOnPivot(t *testing.T) {
+	s := testSession(t)
+	m := New(s)
+	m.spec.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	for _, k := range []string{"f", "F"} {
+		next, _ := m.Update(press(k))
+		got := next.(Model)
+		if got.panel != nil || got.errText == "" {
+			t.Fatalf("key %q: panel %T, errText %q", k, got.panel, got.errText)
+		}
+	}
+}
+
+func TestStatusShowsFilterChips(t *testing.T) {
+	s := testSession(t)
+	m := New(s)
+	m.spec.Filters = []engine.FilterSpec{{Col: "status", Op: engine.OpEq, Value: "FAILED", ColType: "VARCHAR"}}
+	if got := m.renderStatus(); !strings.Contains(got, "status = FAILED") {
+		t.Fatalf("status bar missing chip: %q", got)
+	}
 }
