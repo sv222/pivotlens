@@ -21,6 +21,49 @@ func TestStatsKeyIssuesQuery(t *testing.T) {
 	}
 }
 
+func TestStatsKeyGuardsShrunkenHeaders(t *testing.T) {
+	m := gridModel(t)
+	m.headers = m.headers[:2]
+	m.colCursor = 3
+	next, cmd := m.Update(press("i"))
+	got := next.(Model)
+	if got.panel != nil {
+		t.Error("out-of-range cursor must not open a panel")
+	}
+	if cmd != nil {
+		t.Error("out-of-range cursor must not issue a stats command")
+	}
+	if got.errText == "" {
+		t.Error("out-of-range cursor must set the error bar")
+	}
+}
+
+func TestMetaNameResolvesAlias(t *testing.T) {
+	m := gridModel(t)
+	m.spec.Cols[2].Alias = "amt"
+	m.headers = displayNames(m.spec)
+	if m.headers[2] != "amt" {
+		t.Fatalf("headers = %v, want amt at index 2", m.headers)
+	}
+	if got := m.metaName("amt"); got != "amount" {
+		t.Errorf("metaName(amt) = %q, want amount", got)
+	}
+	if got := m.metaName("region"); got != "region" {
+		t.Errorf("metaName(region) = %q, want region", got)
+	}
+	if got := m.metaName("missing"); got != "missing" {
+		t.Errorf("metaName(missing) = %q, want missing", got)
+	}
+	m.colCursor = 2
+	next, cmd := m.Update(press("i"))
+	if cmd == nil {
+		t.Fatal("i on an aliased column must issue the stats command")
+	}
+	if got := next.(Model); got.panel == nil {
+		t.Error("i on an aliased column must open the stats panel")
+	}
+}
+
 func TestStatsPanelLoadingState(t *testing.T) {
 	m := gridModel(t)
 	m.panel = newStatsPanel("status")

@@ -111,14 +111,27 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.errText = "stats are unavailable on a pivot view"
 			return m, nil
 		}
+		if m.colCursor >= len(m.headers) {
+			m.errText = "column index out of range"
+			return m, nil
+		}
 		col := m.headers[m.colCursor]
 		m.statsReq++
 		m.panel = newStatsPanel(col)
-		return m, statsCmd(m.ctx, m.sess, m.spec, col, m.statsReq)
+		return m, statsCmd(m.ctx, m.sess, m.spec, m.metaName(col), m.statsReq)
 	case "u":
 		return m.undo()
 	}
 	return m, nil
+}
+
+func (m Model) metaName(display string) string {
+	for _, c := range m.spec.Cols {
+		if c.Display() == display {
+			return c.Name
+		}
+	}
+	return display
 }
 
 func pad(s string, w int) string {
