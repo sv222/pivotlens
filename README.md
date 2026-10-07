@@ -110,6 +110,8 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 | `g`, `G` | jump to the first or last row |
 | `h` / `left`, `l` / `right` | scroll one column left or right |
 | `/` | open the filter, `enter` applies it, `esc` cancels |
+| `f` | open a typed filter on the current column: pick an operator, type a value, `enter` applies |
+| `F` | list active filters, `d` marks one for deletion, `enter` applies, `esc` cancels |
 | `s` | open sort on the current column, `a` ascending, `d` descending, `x` clears, `esc` cancels |
 | `u` | undo the last applied sort or filter |
 | `c` | manage columns: `space` hides, `J`/`K` reorder, `r` renames, `enter` applies, `esc` discards |
@@ -167,7 +169,9 @@ by an embedded DuckDB instead of an in-process CSV parser. Unlike
 
 **How do I sort or filter a CSV without opening a spreadsheet?**
 Press `s` to sort the current column, or `/` to type a filter. Both apply
-instantly and can be undone with `u`.
+instantly and can be undone with `u`. Press `f` on a column for a typed
+filter such as `amount > 1000` or `status = FAILED`; `F` lists every active
+filter for review or removal.
 
 **How do I inspect NDJSON or JSON Lines logs from the command line?**
 `pivotlens yourlogs.ndjson` reads the file as a table, one row per line, so
