@@ -39,7 +39,7 @@ func TestTypedPanelNewFilterFlow(t *testing.T) {
 		t.Fatalf("after enter on first op: stage %d, spec %v", p.stage, a.Spec)
 	}
 	p.value.SetValue("FAILED")
-	p, a = updateTyped(p, tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, a = updateTyped(p, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !a.Close || !a.Push || a.Spec == nil {
 		t.Fatalf("action = %+v", a)
 	}

@@ -105,7 +105,7 @@ func TestExportConfirmYesRuns(t *testing.T) {
 	m.panel = p
 	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.panel = next.(Model).panel
-	next, cmd := m.Update(press("y"))
+	_, cmd := m.Update(press("y"))
 	if !ran {
 		t.Error("y must invoke the export run func")
 	}
