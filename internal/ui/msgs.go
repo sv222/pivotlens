@@ -40,6 +40,20 @@ type exportMsg struct {
 	err  error
 }
 
+type statsMsg struct {
+	id    reqID
+	col   string
+	stats engine.ColumnStats
+	err   error
+}
+
+func statsCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, col string, id reqID) tea.Cmd {
+	return func() tea.Msg {
+		st, err := s.Stats(ctx, q, col)
+		return statsMsg{id: id, col: col, stats: st, err: err}
+	}
+}
+
 func exportCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, path, format string, id reqID) tea.Cmd {
 	return func() tea.Msg {
 		return exportMsg{id: id, path: path, err: s.Export(ctx, q, path, format)}

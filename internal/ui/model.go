@@ -38,6 +38,7 @@ type Model struct {
 	pageReq   reqID
 	keySeq    reqID
 	exportReq reqID
+	statsReq  reqID
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -180,6 +181,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errText = ""
 		m.notice = "wrote " + msg.path
 		return m, nil
+
+	case statsMsg:
+		if msg.id != m.statsReq || m.panel == nil {
+			return m, nil
+		}
+		np, a := m.panel.Update(msg)
+		m.panel = np
+		return m.applyPanelAction(a)
 
 	case tea.KeyPressMsg:
 		if m.panel != nil {
