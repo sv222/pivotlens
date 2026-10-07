@@ -47,7 +47,13 @@ func (p *filtersPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 			p.del[p.idx] = !p.del[p.idx]
 		}
 	case "enter":
-		if len(p.del) == 0 {
+		marked := 0
+		for _, v := range p.del {
+			if v {
+				marked++
+			}
+		}
+		if marked == 0 {
 			return p, PanelAction{Close: true}
 		}
 		clone := p.spec.Clone()
@@ -58,7 +64,7 @@ func (p *filtersPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 				clone.Filter = ""
 			}
 		}
-		kept := make([]engine.FilterSpec, 0, len(p.spec.Filters))
+		var kept []engine.FilterSpec
 		for i, f := range p.spec.Filters {
 			if p.del[i+off] {
 				continue

@@ -45,6 +45,16 @@ func TestFilterPanelStaleDebounceIgnored(t *testing.T) {
 	_ = cmd
 }
 
+func TestFilterPanelCursorMoveKeepsCmd(t *testing.T) {
+	m, _ := filterModel(t)
+	m.spec.Filter = "EU"
+	m.panel = newFilterPanel(m.spec.Clone())
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	if cmd == nil {
+		t.Error("cursor move must keep the textinput cmd")
+	}
+}
+
 func TestFilterPanelEnterAppliesAndCloses(t *testing.T) {
 	m, p := filterModel(t)
 	p.input.SetValue("EU")

@@ -75,3 +75,46 @@ func TestFiltersPanelEnterWithoutDeletesCloses(t *testing.T) {
 		t.Fatalf("action = %+v", a)
 	}
 }
+
+func TestFiltersPanelToggledTwiceCloses(t *testing.T) {
+	p := newFiltersPanel(filtersFixture())
+	p, _ = updateFilters(p, press("j"))
+	p, _ = updateFilters(p, press("d"))
+	p, _ = updateFilters(p, press("d"))
+	_, a := updateFilters(p, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !a.Close || a.Spec != nil || a.Push {
+		t.Fatalf("stale false mark must close without committing, action = %+v", a)
+	}
+}
+
+func TestFiltersPanelDeleteLastTypedLeavesFiltersNil(t *testing.T) {
+	q := filtersFixture()
+	q.Filter = ""
+	q.Filters = q.Filters[:1]
+	p := newFiltersPanel(q)
+	p, _ = updateFilters(p, press("d"))
+	_, a := updateFilters(p, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if a.Spec == nil {
+		t.Fatal("deleting the only typed filter must commit")
+	}
+	if a.Spec.Filter != "" {
+		t.Errorf("search must be untouched: %q", a.Spec.Filter)
+	}
+	if a.Spec.Filters != nil {
+		t.Errorf("Filters = %v, want nil", a.Spec.Filters)
+	}
+}
+
+func TestFiltersPanelDeleteSearchKeepsFiltersNil(t *testing.T) {
+	q := filtersFixture()
+	q.Filters = nil
+	p := newFiltersPanel(q)
+	p, _ = updateFilters(p, press("d"))
+	_, a := updateFilters(p, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if a.Spec == nil || a.Spec.Filter != "" {
+		t.Fatalf("action = %+v", a)
+	}
+	if a.Spec.Filters != nil {
+		t.Errorf("Filters = %v, want nil", a.Spec.Filters)
+	}
+}

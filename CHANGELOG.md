@@ -23,3 +23,7 @@ No tags exist yet. Everything below is unreleased history.
 
 ### Fixed
 - Rendering, undo-granularity and version-metadata issues found in review.
+- Renaming columns in the columns panel no longer drops or orphans sort and filter entries when a column is renamed onto a hidden column's display name or an already-aliased column is renamed again.
+- Confirming the filters panel with a toggled-then-untoggled row no longer commits an identical spec and triggers a spurious reload; deleting the last typed filter now leaves `Filters` nil.
+- Selecting an existing `is null` / `is not null` filter in the typed filter panel now applies immediately instead of dead-ending on a value prompt.
+- The filter panel no longer drops the text input's cursor-blink command while typing.

@@ -197,6 +197,73 @@ func TestColumnsHideDropsSortAndFilter(t *testing.T) {
 	}
 }
 
+func TestColumnsRenameOntoHiddenDisplayKeepsEntries(t *testing.T) {
+	m, p := columnsModel(t)
+	i := colIdx(p, "status")
+	p.spec.Cols[colIdx(p, "amount")].Hidden = true
+	p.spec.Sort = []engine.SortKey{{Col: "status"}, {Col: "region"}}
+	p.spec.Filters = []engine.FilterSpec{{Col: "status", Op: engine.OpEq, Value: "FAILED"}}
+	p.idx = i
+	m.panel = p
+	next, _ := m.Update(press("r"))
+	cp := next.(Model).panel.(*columnsPanel)
+	cp.input.SetValue("amount")
+	m.panel = cp
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.panel = next.(Model).panel
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got := next.(Model)
+	if got.panel != nil {
+		t.Fatal("enter must close the panel")
+	}
+	if len(got.spec.Sort) != 2 || got.spec.Sort[0].Col != "amount" || got.spec.Sort[1].Col != "region" {
+		t.Errorf("sort entries not reconciled: %+v", got.spec.Sort)
+	}
+	if len(got.spec.Filters) != 1 || got.spec.Filters[0].Col != "amount" {
+		t.Errorf("filter entries not reconciled: %+v", got.spec.Filters)
+	}
+}
+
+func TestColumnsRenameAliasedColumnReconciles(t *testing.T) {
+	m, p := columnsModel(t)
+	i := colIdx(p, "status")
+	p.spec.Sort = []engine.SortKey{{Col: "status"}}
+	p.spec.Filters = []engine.FilterSpec{{Col: "status", Op: engine.OpEq, Value: "FAILED"}}
+	p.idx = i
+	m.panel = p
+	next, _ := m.Update(press("r"))
+	cp := next.(Model).panel.(*columnsPanel)
+	cp.input.SetValue("st")
+	m.panel = cp
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.panel = next.(Model).panel
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got := next.(Model)
+	if got.spec.Sort[0].Col != "st" || got.spec.Filters[0].Col != "st" {
+		t.Fatalf("first rename not reconciled: %+v %+v", got.spec.Sort, got.spec.Filters)
+	}
+	p2 := newColumnsPanel(got.spec.Clone())
+	p2.idx = colIdx(p2, "status")
+	m.panel = p2
+	next, _ = m.Update(press("r"))
+	cp2 := next.(Model).panel.(*columnsPanel)
+	if cp2.input.Value() != "st" {
+		t.Fatalf("rename input must prefill the live alias: %q", cp2.input.Value())
+	}
+	cp2.input.SetValue("st2")
+	m.panel = cp2
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.panel = next.(Model).panel
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got = next.(Model)
+	if got.spec.Sort[0].Col != "st2" {
+		t.Errorf("sort orphaned by second rename: %+v", got.spec.Sort)
+	}
+	if got.spec.Filters[0].Col != "st2" {
+		t.Errorf("filter orphaned by second rename: %+v", got.spec.Filters)
+	}
+}
+
 func TestColumnsViewShowsHiddenAndAlias(t *testing.T) {
 	m, p := columnsModel(t)
 	p.spec.Cols[colIdx(p, "status")].Alias = "st"

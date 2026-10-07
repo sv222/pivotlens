@@ -95,6 +95,9 @@ func (p *filterTypedPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 			e := p.existing[p.idx]
 			p.editing = &p.existing[p.idx]
 			p.op = e.Op
+			if p.op == engine.OpNull || p.op == engine.OpNotNull {
+				return p, p.apply("")
+			}
 			p.value.SetValue(e.Value)
 			p.value.Focus()
 			p.stage = 1

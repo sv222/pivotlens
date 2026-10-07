@@ -41,7 +41,7 @@ func (m Model) applyPanelAction(a PanelAction) (tea.Model, tea.Cmd) {
 		}
 		m.pending = a.Spec
 		m.keySeq++
-		return m, debounceCmd(m.keySeq)
+		return m, tea.Batch(a.Cmd, debounceCmd(m.keySeq))
 	}
 	if a.Push {
 		m = m.push()

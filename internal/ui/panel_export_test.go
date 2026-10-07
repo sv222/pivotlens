@@ -88,6 +88,35 @@ func TestExportConfirmNoKeepsPanel(t *testing.T) {
 	}
 }
 
+func TestExportConfirmYesRuns(t *testing.T) {
+	path := exportPath(t)
+	if err := writeFile(path, "x"); err != nil {
+		t.Fatal(err)
+	}
+	var ranTo string
+	ran := false
+	m := gridModel(t)
+	p := newExportPanel(m.spec.Clone(), func(q engine.QuerySpec, path string) tea.Cmd {
+		ran = true
+		ranTo = path
+		return func() tea.Msg { return exportMsg{id: 1, path: path} }
+	})
+	p.input.SetValue(path)
+	m.panel = p
+	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.panel = next.(Model).panel
+	next, cmd := m.Update(press("y"))
+	if !ran {
+		t.Error("y must invoke the export run func")
+	}
+	if ranTo != path {
+		t.Errorf("run path = %q, want %q", ranTo, path)
+	}
+	if cmd == nil {
+		t.Error("y must return the run cmd")
+	}
+}
+
 func TestExportMsgSuccessSetsNotice(t *testing.T) {
 	m := gridModel(t)
 	m.exportReq = 3

@@ -84,6 +84,22 @@ func TestTypedPanelEditReplaces(t *testing.T) {
 	}
 }
 
+func TestTypedPanelEditNullOpApplies(t *testing.T) {
+	q := typedFixture(t).spec
+	q.Filters = []engine.FilterSpec{{Col: "status", Op: engine.OpNull, ColType: "VARCHAR"}}
+	p := newFilterTypedPanel(q, "status", "VARCHAR")
+	_, a := updateTyped(p, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !a.Close || a.Spec == nil {
+		t.Fatalf("action = %+v", a)
+	}
+	if p.stage != 0 {
+		t.Errorf("null op must not enter the value stage, stage = %d", p.stage)
+	}
+	if got := a.Spec.Filters[0]; got.Op != engine.OpNull || got.Col != "status" {
+		t.Fatalf("filter = %+v", got)
+	}
+}
+
 func TestTypedPanelEscFlow(t *testing.T) {
 	p, _ := updateTyped(typedFixture(t), tea.KeyPressMsg{Code: tea.KeyEnter})
 	p, a := updateTyped(p, tea.KeyPressMsg{Code: tea.KeyEscape})

@@ -11,6 +11,7 @@ import (
 
 type columnsPanel struct {
 	spec     engine.QuerySpec
+	orig     []string
 	idx      int
 	renaming bool
 	input    textinput.Model
@@ -20,7 +21,11 @@ type columnsPanel struct {
 func newColumnsPanel(spec engine.QuerySpec) *columnsPanel {
 	ti := textinput.New()
 	ti.Prompt = "rename: "
-	return &columnsPanel{spec: spec, input: ti}
+	orig := make([]string, len(spec.Cols))
+	for i, c := range spec.Cols {
+		orig[i] = c.Display()
+	}
+	return &columnsPanel{spec: spec, orig: orig, input: ti}
 }
 
 func (p *columnsPanel) dupDisplay() string {
@@ -38,6 +43,25 @@ func (p *columnsPanel) dupDisplay() string {
 	return ""
 }
 
+func (p *columnsPanel) resolve(col string) (int, bool) {
+	for j, o := range p.orig {
+		if o == col && !p.spec.Cols[j].Hidden {
+			return j, true
+		}
+	}
+	for j, o := range p.orig {
+		if o == col {
+			return j, true
+		}
+	}
+	for j, c := range p.spec.Cols {
+		if c.Display() == col && !c.Hidden {
+			return j, true
+		}
+	}
+	return 0, false
+}
+
 func (p *columnsPanel) commit() PanelAction {
 	vis := 0
 	for _, c := range p.spec.Cols {
@@ -53,36 +77,24 @@ func (p *columnsPanel) commit() PanelAction {
 		p.errText = "duplicate column name " + d
 		return PanelAction{}
 	}
-	hidden := map[string]bool{}
-	for _, c := range p.spec.Cols {
-		if c.Hidden {
-			hidden[c.Display()] = true
-		}
-	}
-	renamed := map[string]string{}
-	for _, c := range p.spec.Cols {
-		if c.Alias != "" && c.Alias != c.Name {
-			renamed[c.Name] = c.Alias
-		}
-	}
 	sort := make([]engine.SortKey, 0, len(p.spec.Sort))
 	for _, k := range p.spec.Sort {
-		if d, ok := renamed[k.Col]; ok {
-			k.Col = d
-		}
-		if hidden[k.Col] {
-			continue
+		if j, ok := p.resolve(k.Col); ok {
+			if p.spec.Cols[j].Hidden {
+				continue
+			}
+			k.Col = p.spec.Cols[j].Display()
 		}
 		sort = append(sort, k)
 	}
 	p.spec.Sort = sort
 	filters := make([]engine.FilterSpec, 0, len(p.spec.Filters))
 	for _, f := range p.spec.Filters {
-		if d, ok := renamed[f.Col]; ok {
-			f.Col = d
-		}
-		if hidden[f.Col] {
-			continue
+		if j, ok := p.resolve(f.Col); ok {
+			if p.spec.Cols[j].Hidden {
+				continue
+			}
+			f.Col = p.spec.Cols[j].Display()
 		}
 		filters = append(filters, f)
 	}

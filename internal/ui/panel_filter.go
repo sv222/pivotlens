@@ -53,8 +53,11 @@ func (p *filterPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 	case "enter":
 		return p, p.action(true)
 	}
-	p.input, _ = p.input.Update(msg)
-	return p, p.action(false)
+	var cmd tea.Cmd
+	p.input, cmd = p.input.Update(msg)
+	a := p.action(false)
+	a.Cmd = cmd
+	return p, a
 }
 
 func (p *filterPanel) View(s Styles, w int) string {
