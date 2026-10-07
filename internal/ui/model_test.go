@@ -146,6 +146,22 @@ func TestFilterKeysRefusedOnPivot(t *testing.T) {
 	}
 }
 
+func TestFilterKeysGuardShrunkenHeaders(t *testing.T) {
+	for _, k := range []string{"f", "F"} {
+		m := gridModel(t)
+		m.headers = m.headers[:2]
+		m.colCursor = 3
+		next, _ := m.Update(press(k))
+		got := next.(Model)
+		if got.panel != nil {
+			t.Errorf("key %q: out-of-range cursor must not open a panel", k)
+		}
+		if got.errText == "" {
+			t.Errorf("key %q: out-of-range cursor must set the error bar", k)
+		}
+	}
+}
+
 func TestStatusShowsFilterChips(t *testing.T) {
 	s := testSession(t)
 	m := New(s)

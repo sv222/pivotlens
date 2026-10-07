@@ -96,6 +96,10 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.errText = "filters are unavailable on a pivot view"
 			return m, nil
 		}
+		if m.colCursor >= len(m.headers) {
+			m.errText = "column index out of range"
+			return m, nil
+		}
 		if msg.String() == "f" {
 			col := m.headers[m.colCursor]
 			ct := m.colType(col)
