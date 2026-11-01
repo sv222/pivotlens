@@ -40,6 +40,19 @@ type exportMsg struct {
 	err  error
 }
 
+type pivotMsg struct {
+	id   reqID
+	spec engine.QuerySpec
+	err  error
+}
+
+func pivotCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, id reqID) tea.Cmd {
+	return func() tea.Msg {
+		r, err := s.ResolvePivot(ctx, q)
+		return pivotMsg{id: id, spec: r, err: err}
+	}
+}
+
 type statsMsg struct {
 	id    reqID
 	col   string
