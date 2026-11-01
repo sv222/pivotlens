@@ -151,26 +151,10 @@ func (q QuerySpec) body() (string, error) {
 	if q.Pivot == nil {
 		return "SELECT * FROM filtered" + q.orderBy(), nil
 	}
-	p := *q.Pivot
-	if len(p.Rows) == 0 {
-		return "", errors.New("pivot needs at least one row group")
-	}
-	if p.On == "" {
-		return "", errors.New("pivot needs a pivot column")
-	}
-	agg, err := aggExpr(p.Agg, p.AggCol)
-	if err != nil {
-		return "", err
-	}
-	rows := make([]string, len(p.Rows))
-	for i, r := range p.Rows {
-		rows[i] = qi(r)
-	}
-	return "PIVOT filtered ON " + qi(p.On) + " USING " + agg +
-		" GROUP BY " + strings.Join(rows, ", "), nil
+	return q.pivotBody()
 }
 
-func (q QuerySpec) PageSQL(limit, offset int) (string, error) {
+func (q QuerySpec) SQL() (string, error) {
 	pre, err := q.prefix()
 	if err != nil {
 		return "", err
@@ -179,7 +163,15 @@ func (q QuerySpec) PageSQL(limit, offset int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return pre + b + " LIMIT " + itoa(limit) + " OFFSET " + itoa(offset), nil
+	return pre + b, nil
+}
+
+func (q QuerySpec) PageSQL(limit, offset int) (string, error) {
+	text, err := q.SQL()
+	if err != nil {
+		return "", err
+	}
+	return text + " LIMIT " + itoa(limit) + " OFFSET " + itoa(offset), nil
 }
 
 func (q QuerySpec) CountSQL() (string, error) {
@@ -224,15 +216,11 @@ func (q QuerySpec) ExportSQL(path, format string) (string, error) {
 	default:
 		return "", errors.New("unsupported export format " + format)
 	}
-	pre, err := q.prefix()
+	text, err := q.SQL()
 	if err != nil {
 		return "", err
 	}
-	b, err := q.body()
-	if err != nil {
-		return "", err
-	}
-	return "COPY (" + pre + b + ") TO " + ql(path) + " " + opts, nil
+	return "COPY (" + text + ") TO " + ql(path) + " " + opts, nil
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }

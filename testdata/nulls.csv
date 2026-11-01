@@ -1,0 +1,6 @@
+region,status,amount
+US,OK,10
+US,,5
+,OK,
+EU,FAIL,7
+US,OK,3

@@ -101,11 +101,15 @@ func TestPivotExecutes(t *testing.T) {
 	s := openFixture(t, "tiny.csv")
 	q := NewSpec(s.Columns())
 	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"}
+	q, err := s.ResolvePivot(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
 	rows, cols, err := s.FetchPage(context.Background(), q, 100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cols) < 2 {
+	if len(cols) != 4 {
 		t.Fatalf("pivot produced %d columns", len(cols))
 	}
 	if len(rows) != 4 {
@@ -117,6 +121,10 @@ func TestWidthsForPivot(t *testing.T) {
 	s := openFixture(t, "tiny.csv")
 	q := NewSpec(s.Columns())
 	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	q, err := s.ResolvePivot(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
 	w, err := s.Widths(context.Background(), q, 100)
 	if err != nil {
 		t.Fatal(err)
