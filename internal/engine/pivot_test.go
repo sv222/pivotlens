@@ -215,3 +215,33 @@ func TestParsePivot(t *testing.T) {
 		}
 	}
 }
+
+func openNDJSON(t *testing.T, body string) *Session {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "rows.ndjson")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
+
+func TestPivotEmptyStringColumnValue(t *testing.T) {
+	s := openNDJSON(t, `{"region":"EU","status":"","amount":1}
+{"region":"EU","status":"ok","amount":2}
+{"region":"US","status":"","amount":4}
+`)
+	cols, rows := pivotRows(t, s, NewSpec(s.Columns()),
+		PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"})
+	if want := []string{"region", EmptyText, "ok"}; !reflect.DeepEqual(cols, want) {
+		t.Fatalf("cols = %v, want %v", cols, want)
+	}
+	want := [][]string{{"EU", "1", "2"}, {"US", "4", "NULL"}}
+	if !reflect.DeepEqual(rows, want) {
+		t.Errorf("rows = %v, want %v", rows, want)
+	}
+}

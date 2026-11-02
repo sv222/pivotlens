@@ -13,7 +13,16 @@ const PivotLimit = 50
 
 var PivotAggs = []string{"count", "sum", "avg", "min", "max"}
 
+const EmptyText = "(empty)"
+
 var ErrPivotLimit = errors.New("too many pivot columns")
+
+func pivotLabel(v string) string {
+	if v == "" {
+		return EmptyText
+	}
+	return v
+}
 
 func (p PivotSpec) Label() string {
 	if p.AggCol == "" {
@@ -27,7 +36,9 @@ func (p PivotSpec) Columns() []string {
 	if p.On == "" {
 		return append(out, p.Label())
 	}
-	out = append(out, p.Values...)
+	for _, v := range p.Values {
+		out = append(out, pivotLabel(v))
+	}
 	if p.Null {
 		out = append(out, NullText)
 	}
@@ -95,7 +106,7 @@ func (q QuerySpec) pivotBody() (string, error) {
 	} else {
 		on := qi(p.On)
 		for _, v := range p.Values {
-			sel = append(sel, agg+" FILTER (WHERE CAST("+on+" AS VARCHAR) = "+ql(v)+") AS "+qi(v))
+			sel = append(sel, agg+" FILTER (WHERE CAST("+on+" AS VARCHAR) = "+ql(v)+") AS "+qi(pivotLabel(v)))
 		}
 		if p.Null {
 			sel = append(sel, agg+" FILTER (WHERE "+on+" IS NULL) AS "+qi(NullText))
