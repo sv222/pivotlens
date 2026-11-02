@@ -18,12 +18,11 @@ pivotlens is an open source CSV, Parquet and NDJSON viewer for the terminal:
 an interactive grid backed by an embedded DuckDB. It is for anyone who needs
 to check a data file - a data engineer, an analyst, a backend developer
 looking at a log export - without opening a spreadsheet or writing a script.
-Point it at a file and you get a scrollable grid with sort and filter over
-millions of rows, no SQL required.
+Point it at a file and you get a scrollable grid with sort, filter and
+pivot tables over millions of rows, no SQL required.
 
-It is early. Opening a file, scrolling, sorting, filtering, column
-management and export all work today. A pivot-table builder is planned
-but not built yet, so the name is ahead of the tool for now.
+It is early, but opening a file, scrolling, sorting, filtering, column
+management, pivot tables and export all work today.
 
 ## The problem
 
@@ -102,6 +101,8 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 | Flag | Effect |
 |---|---|
 | `-v`, `--version` | print the version and exit |
+| `--pivot spec` | print a pivot table as CSV and exit, see [Pivot tables](#pivot-tables) |
+| `-o`, `--output file` | with `--pivot`, write to a `.csv` or `.parquet` file instead of stdout |
 
 | Key | Effect |
 |---|---|
@@ -117,11 +118,44 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 | `c` | manage columns: `space` hides, `J`/`K` reorder, `r` renames, `enter` applies, `esc` discards |
 | `e` | export the current view to a `.csv` or `.parquet` file |
 | `i` | show statistics for the current column over the filtered view |
+| `p` | build a pivot table: pick rows, columns, aggregate and values with `j`/`k` and `enter`, `esc` steps back |
 | `q`, `ctrl+c` | quit |
+
+## Pivot tables
+
+Press `p` in the grid and pick, one step at a time:
+
+1. a row field, such as `region`
+2. a column field, such as `status`, or `(none)` for one value per row
+3. an aggregate: `count`, `sum`, `avg`, `min` or `max`
+4. a value field, such as `amount` (`count` also accepts `(none)` to count rows)
+
+The pivot opens as a new grid. Scroll, sort (`s`) and export (`e`) work as
+in the main view; `u` goes back to the data. Active filters apply to the
+pivot, so filter first to pivot a subset.
+
+The same pivot from the command line, for scripts:
+
+```
+$ pivotlens --pivot rows=region,cols=status,values=amount,agg=sum testdata/tiny.csv
+region,COMPLETED,FAILED,PENDING
+AP-SOUTH,312.25,,
+EU-CENT,12.5,84,
+US-EAST,1420.5,,
+US-WEST,,,9120
+```
+
+`cols` and `values` are optional, `agg` defaults to `count`. Add
+`-o pivot.parquet` to write a file instead of printing.
+
+DuckDB computes the pivot with one `GROUP BY` query, so it stays fast on
+millions of rows. A column field may have at most 50 distinct values;
+past that, pivotlens refuses and asks for a field with fewer values. Rows
+or columns whose field is empty show up as `NULL`.
 
 ## How it works
 
-Every view - the open file, an applied sort, a typed filter - is one
+Every view - the open file, an applied sort, a typed filter, a pivot - is one
 `QuerySpec` value. A pure function compiles that struct into a single SQL
 statement; DuckDB runs it. The grid never loads a whole file into memory:
 it fetches the visible rows in 200-row pages as you scroll. Sorting and
@@ -144,7 +178,7 @@ column rather than a line, and you get sort and filter with it.
 | `visidata` | yes | yes | yes | csv, tsv, json, xlsx, and more via plugins |
 | `csvlens` | yes | yes | yes | csv only |
 | `duckdb` CLI | no, SQL shell | yes | no, SQL required | csv, parquet, json, and more |
-| pivotlens | yes | yes | yes | csv, parquet, ndjson |
+| pivotlens | yes, with pivot tables | yes | yes | csv, parquet, ndjson |
 
 ## FAQ
 
@@ -172,6 +206,12 @@ Press `s` to sort the current column, or `/` to type a filter. Both apply
 instantly and can be undone with `u`. Press `f` on a column for a typed
 filter such as `amount > 1000` or `status = FAILED`; `F` lists every active
 filter for review or removal.
+
+**How do I make a pivot table from a CSV without Excel?**
+Press `p` in `pivotlens`, pick a row field, a column field, an aggregate
+and a value field. For a script, run
+`pivotlens --pivot rows=region,cols=status,values=amount,agg=sum data.csv`
+and it prints the pivot as CSV. It works the same on Parquet and NDJSON.
 
 **How do I inspect NDJSON or JSON Lines logs from the command line?**
 `pivotlens yourlogs.ndjson` reads the file as a table, one row per line, so
