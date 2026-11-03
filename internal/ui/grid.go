@@ -182,6 +182,8 @@ func (m Model) repivot(change func(*engine.PivotSpec)) (tea.Model, tea.Cmd) {
 	}
 	q := m.spec.Clone()
 	change(q.Pivot)
+	cols := q.Pivot.Columns()
+	q.Sort = slices.DeleteFunc(q.Sort, func(k engine.SortKey) bool { return !slices.Contains(cols, k.Col) })
 	m.pivotReq++
 	return m, pivotCmd(m.ctx, m.sess, q, m.pivotReq)
 }
