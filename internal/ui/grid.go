@@ -329,7 +329,11 @@ func (m Model) renderStatus() string {
 	if m.notice != "" {
 		parts = append(parts, m.notice)
 	}
-	parts = append(parts, "[/] filter  [s] sort  [u] undo  [q] quit")
+	if m.spec.Pivot != nil {
+		parts = append(parts, "[t] totals  [%] percent  [s] sort  [u] back  [q] quit")
+	} else {
+		parts = append(parts, "[/] filter  [s] sort  [u] undo  [q] quit")
+	}
 	return m.styles.Status.Render(pad(strings.Join(parts, "  │  "), m.w))
 }
 
