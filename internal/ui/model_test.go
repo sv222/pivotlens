@@ -136,7 +136,7 @@ func TestFOpenFiltersPanel(t *testing.T) {
 func TestFilterKeysRefusedOnPivot(t *testing.T) {
 	s := testSession(t)
 	m := New(s)
-	m.spec.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	m.spec.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Measures: []engine.Measure{{Agg: "count"}}}
 	for _, k := range []string{"f", "F"} {
 		next, _ := m.Update(press(k))
 		got := next.(Model)

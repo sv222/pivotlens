@@ -100,7 +100,7 @@ func TestWidths(t *testing.T) {
 func TestPivotExecutes(t *testing.T) {
 	s := openFixture(t, "tiny.csv")
 	q := NewSpec(s.Columns())
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Measures: []Measure{{Agg: "sum", Col: "amount"}}}
 	q, err := s.ResolvePivot(context.Background(), q)
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func TestPivotExecutes(t *testing.T) {
 func TestWidthsForPivot(t *testing.T) {
 	s := openFixture(t, "tiny.csv")
 	q := NewSpec(s.Columns())
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Measures: []Measure{{Agg: "count"}}}
 	q, err := s.ResolvePivot(context.Background(), q)
 	if err != nil {
 		t.Fatal(err)

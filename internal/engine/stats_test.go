@@ -35,7 +35,7 @@ func TestStatsSQLNumeric(t *testing.T) {
 
 func TestStatsSQLRejectsPivot(t *testing.T) {
 	q := statsSpec()
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Measures: []Measure{{Agg: "count"}}}
 	if _, err := q.StatsSQL("region", false); err != ErrPivotStats {
 		t.Fatalf("err = %v, want ErrPivotStats", err)
 	}

@@ -77,7 +77,7 @@ func TestSelectListNoVisibleColumns(t *testing.T) {
 func TestCloneIsDeep(t *testing.T) {
 	q := demoSpec()
 	q.Sort = []SortKey{{Col: "region"}}
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Measures: []Measure{{Agg: "sum", Col: "amount"}}}
 	c := q.Clone()
 	c.Cols[0].Alias = "changed"
 	c.Sort[0].Desc = true
@@ -209,7 +209,7 @@ func TestWidthsSQL(t *testing.T) {
 
 func TestPivotSQL(t *testing.T) {
 	q := demoSpec()
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Agg: "sum", AggCol: "amount", Values: []string{"1", "it's"}, Null: true}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Measures: []Measure{{Agg: "sum", Col: "amount"}}, Keys: []string{"1", "it's"}, Null: true}
 	got, err := q.PageSQL(100, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +226,7 @@ func TestPivotSQL(t *testing.T) {
 
 func TestPivotSQLWithoutColumnField(t *testing.T) {
 	q := demoSpec()
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, Agg: "count"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, Measures: []Measure{{Agg: "count"}}}
 	q.Sort = []SortKey{{Col: "count", Desc: true}}
 	got, err := q.PageSQL(10, 0)
 	if err != nil {
@@ -241,7 +241,7 @@ func TestPivotSQLWithoutColumnField(t *testing.T) {
 
 func TestPivotRequiresRows(t *testing.T) {
 	q := demoSpec()
-	q.Pivot = &PivotSpec{On: "amount", Agg: "count"}
+	q.Pivot = &PivotSpec{On: "amount", Measures: []Measure{{Agg: "count"}}}
 	if _, err := q.PageSQL(1, 0); err == nil {
 		t.Error("pivot without a row field must fail")
 	}
@@ -249,7 +249,7 @@ func TestPivotRequiresRows(t *testing.T) {
 
 func TestWidthsSQLRejectsPivot(t *testing.T) {
 	q := demoSpec()
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Agg: "count"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Measures: []Measure{{Agg: "count"}}}
 	if _, err := q.WidthsSQL(10); err == nil {
 		t.Error("WidthsSQL must refuse a pivot spec")
 	}

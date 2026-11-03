@@ -28,15 +28,17 @@ type SortKey struct {
 	Desc bool
 }
 
+type Measure struct {
+	Agg string
+	Col string
+}
+
 type PivotSpec struct {
-	Rows    []string
-	On      string
-	Agg     string
-	AggCol  string
-	Keys    []string
-	Values  []string
-	Null    bool
-	NullCol string
+	Rows     []string
+	On       string
+	Measures []Measure
+	Keys     []string
+	Null     bool
 }
 
 type QuerySpec struct {
@@ -75,8 +77,8 @@ func (q QuerySpec) Clone() QuerySpec {
 	if q.Pivot != nil {
 		p := *q.Pivot
 		p.Rows = append([]string(nil), q.Pivot.Rows...)
+		p.Measures = append([]Measure(nil), q.Pivot.Measures...)
 		p.Keys = append([]string(nil), q.Pivot.Keys...)
-		p.Values = append([]string(nil), q.Pivot.Values...)
 		n.Pivot = &p
 	}
 	return n
