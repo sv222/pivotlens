@@ -120,12 +120,13 @@ func (p PivotSpec) String() string {
 }
 
 func parseMeasure(item, agg string) Measure {
-	if i := strings.LastIndex(item, ":"); i >= 0 && slices.Contains(PivotAggs, strings.ToLower(item[i+1:])) {
+	i := strings.LastIndex(item, ":")
+	if a := strings.ToLower(strings.TrimSpace(item[i+1:])); i >= 0 && slices.Contains(PivotAggs, a) {
 		col := strings.TrimSpace(item[:i])
 		if col == "*" {
 			col = ""
 		}
-		return Measure{Agg: strings.ToLower(item[i+1:]), Col: col}
+		return Measure{Agg: a, Col: col}
 	}
 	return Measure{Agg: agg, Col: item}
 }
