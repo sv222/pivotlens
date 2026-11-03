@@ -229,7 +229,7 @@ func (q QuerySpec) pivotBody() (string, error) {
 	on := qi(p.On)
 	for _, c := range cs {
 		n := qi(c.name)
-		if !p.shown(c) && !(c.total && p.Percent != "") {
+		if !(p.shown(c) || c.total && p.Percent != "") {
 			continue
 		}
 		e := aggs[c.m]
