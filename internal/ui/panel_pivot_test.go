@@ -151,3 +151,43 @@ func TestPivotPanelSumAvgOfferNumericFieldsOnly(t *testing.T) {
 		t.Errorf("count options = %v", got)
 	}
 }
+
+func pivotModel(t *testing.T) Model {
+	t.Helper()
+	m := gridModel(t)
+	q := m.spec.Clone()
+	q.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Measures: []engine.Measure{{Agg: "count"}}}
+	r, err := m.sess.ResolvePivot(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.pivotReq = 1
+	next, _ := m.Update(pivotMsg{id: 1, spec: r})
+	return next.(Model)
+}
+
+func runPivotKey(t *testing.T, m Model, key string) Model {
+	t.Helper()
+	next, cmd := m.Update(press(key))
+	if cmd == nil {
+		t.Fatalf("key %q gave no command: %q", key, next.(Model).errText)
+	}
+	next, _ = next.Update(cmd())
+	return next.(Model)
+}
+
+func TestTotalsKeyTogglesTotals(t *testing.T) {
+	if next, _ := gridModel(t).Update(press("t")); next.(Model).errText == "" {
+		t.Error("t outside a pivot view must be refused")
+	}
+	m := runPivotKey(t, pivotModel(t), "t")
+	if want := "region COMPLETED FAILED PENDING Total"; strings.Join(m.headers, " ") != want {
+		t.Errorf("headers = %v, want %s", m.headers, want)
+	}
+	if !strings.Contains(m.renderStatus(), "with totals") {
+		t.Errorf("status = %q", m.renderStatus())
+	}
+	if m = runPivotKey(t, m, "t"); m.spec.Pivot.Totals {
+		t.Error("second t must turn totals off")
+	}
+}

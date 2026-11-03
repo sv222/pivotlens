@@ -375,3 +375,85 @@ func TestParsePivotSeveralValues(t *testing.T) {
 		}
 	}
 }
+
+func TestPivotTotals(t *testing.T) {
+	head := []string{"region", "COMPLETED", "FAILED", "PENDING", "Total"}
+	cases := []struct {
+		file string
+		head []string
+		want [][]string
+	}{
+		{"tiny.csv", head, [][]string{
+			{"AP-SOUTH", "312.25", "NULL", "NULL", "312.25"},
+			{"EU-CENT", "12.5", "84", "NULL", "96.5"},
+			{"US-EAST", "1420.5", "NULL", "NULL", "1420.5"},
+			{"US-WEST", "NULL", "NULL", "9120", "9120"},
+			{"Total", "1745.25", "84", "9120", "10949.25"},
+		}},
+		{"tiny.parquet", head, nil},
+		{"tiny.ndjson", []string{"region", "COMPLETED", "FAILED", "Total"}, [][]string{
+			{"AP-SOUTH", "312.25", "NULL", "312.25"},
+			{"EU-CENT", "NULL", "84", "84"},
+			{"US-EAST", "1420.5", "NULL", "1420.5"},
+			{"Total", "1732.75", "84", "1816.75"},
+		}},
+	}
+	cases[1].want = cases[0].want
+	for _, c := range cases {
+		t.Run(c.file, func(t *testing.T) {
+			s := openFixture(t, c.file)
+			cols, rows := pivotRows(t, s, NewSpec(s.Columns()), PivotSpec{Rows: []string{"region"}, On: "status",
+				Measures: []Measure{{Agg: "sum", Col: "amount"}}, Totals: true})
+			if !reflect.DeepEqual(cols, c.head) || !reflect.DeepEqual(rows, c.want) {
+				t.Errorf("cols %v rows %v, want %v %v", cols, rows, c.head, c.want)
+			}
+		})
+	}
+}
+
+func TestPivotTotalsSortedAndExported(t *testing.T) {
+	s := openFixture(t, "nulls.csv")
+	q := NewSpec(s.Columns())
+	q.Sort = []SortKey{{Col: "Total count", Desc: true}, {Col: "region"}}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Totals: true,
+		Measures: []Measure{{Agg: "avg", Col: "amount"}, {Agg: "count"}}}
+	q, err := s.ResolvePivot(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "region,FAIL avg(amount),FAIL count,OK avg(amount),OK count,NULL avg(amount),NULL count,Total avg(amount),Total count\n" +
+		"US,,0,6.5,2,5,1,6,3\n" +
+		"EU,7,1,,0,,0,7,1\n" +
+		",,0,,1,,0,,1\n" +
+		"Total,7,1,6.5,3,5,1,6.25,5\n"
+	var buf bytes.Buffer
+	if err := s.WriteCSV(context.Background(), q, &buf); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != want {
+		t.Errorf("WriteCSV = %q, want %q", buf.String(), want)
+	}
+	for _, format := range []string{"csv", "parquet", "ndjson"} {
+		path := filepath.Join(t.TempDir(), "t."+format)
+		if err := s.Export(context.Background(), q, path, format); err != nil {
+			t.Fatal(err)
+		}
+		back := openFixturePath(t, path)
+		rows, _, err := back.FetchPage(context.Background(), NewSpec(back.Columns()), 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 4 || rows[3][0] != "Total" || rows[3][8] != "5" {
+			t.Errorf("%s export rows = %v", format, rows)
+		}
+	}
+}
+
+func TestParsePivotTotals(t *testing.T) {
+	if p, err := ParsePivot("rows=r,totals=true"); err != nil || !p.Totals {
+		t.Errorf("totals: %+v %v", p, err)
+	}
+	if _, err := ParsePivot("rows=r,totals=maybe"); err == nil {
+		t.Error("bad totals must fail")
+	}
+}

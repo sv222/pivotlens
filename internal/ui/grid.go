@@ -161,10 +161,23 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.statsReq++
 		m.panel = newStatsPanel(col)
 		return m, statsCmd(m.ctx, m.sess, m.spec, m.metaName(col), m.statsReq)
+	case "t":
+		return m.repivot(func(p *engine.PivotSpec) { p.Totals = !p.Totals })
 	case "u":
 		return m.undo()
 	}
 	return m, nil
+}
+
+func (m Model) repivot(change func(*engine.PivotSpec)) (tea.Model, tea.Cmd) {
+	if m.spec.Pivot == nil {
+		m.errText = "not a pivot view, press p to build one"
+		return m, nil
+	}
+	q := m.spec.Clone()
+	change(q.Pivot)
+	m.pivotReq++
+	return m, pivotCmd(m.ctx, m.sess, q, m.pivotReq)
 }
 
 func (m Model) metaName(display string) string {
