@@ -281,3 +281,42 @@ func TestPivotCollidingColumnValues(t *testing.T) {
 		t.Errorf("rows = %v, want %v", rows, want)
 	}
 }
+
+func TestPivotExportFormats(t *testing.T) {
+	for _, file := range []string{"tiny.csv", "tiny.parquet", "tiny.ndjson"} {
+		t.Run(file, func(t *testing.T) {
+			s := openFixture(t, file)
+			q := NewSpec(s.Columns())
+			q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+			q, err := s.ResolvePivot(context.Background(), q)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, want := pivotRows(t, s, q, *q.Pivot)
+			for _, format := range []string{"parquet", "ndjson"} {
+				path := filepath.Join(t.TempDir(), "p."+format)
+				if err := s.Export(context.Background(), q, path, format); err != nil {
+					t.Fatal(err)
+				}
+				back := openFixturePath(t, path)
+				got, cols, err := back.FetchPage(context.Background(), NewSpec(back.Columns()), 100, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(cols, q.Pivot.Columns()) || !reflect.DeepEqual(got, want) {
+					t.Errorf("%s: cols %v rows %v, want %v %v", format, cols, got, q.Pivot.Columns(), want)
+				}
+			}
+		})
+	}
+}
+
+func openFixturePath(t *testing.T, path string) *Session {
+	t.Helper()
+	s, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
