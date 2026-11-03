@@ -7,7 +7,7 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.2.0]
+## [0.2.0] - 2026-11-03
 
 ### Added
 - Pivot tables: `p` opens a pivot builder. Pick a row field, an optional column field, an aggregate (count, sum, avg, min, max) and a value field. DuckDB computes the result, which opens as a grid you can scroll, sort and export like the main view; `u` goes back.
