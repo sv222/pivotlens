@@ -39,6 +39,7 @@ type Model struct {
 	keySeq    reqID
 	exportReq reqID
 	statsReq  reqID
+	pivotReq  reqID
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -66,6 +67,9 @@ func New(s *engine.Session) Model {
 }
 
 func displayNames(q engine.QuerySpec) []string {
+	if q.Pivot != nil {
+		return q.Pivot.Columns()
+	}
 	vis := q.Visible()
 	out := make([]string, len(vis))
 	for i, c := range vis {
@@ -136,6 +140,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.widths) != len(msg.cols) {
 				m.widths = Fit(nil, m.headers)
 			}
+			if m.colCursor >= len(m.headers) {
+				m.colCursor, m.colStart = len(m.headers)-1, 0
+				m = m.syncColStart()
+			}
 		}
 		return m, nil
 
@@ -181,6 +189,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errText = ""
 		m.notice = "wrote " + msg.path
 		return m, nil
+
+	case pivotMsg:
+		if msg.id != m.pivotReq {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.errText = msg.err.Error()
+			return m, nil
+		}
+		m = m.push()
+		m.spec = msg.spec
+		m.colCursor = 0
+		return m.reload()
 
 	case statsMsg:
 		if msg.id != m.statsReq || m.panel == nil {

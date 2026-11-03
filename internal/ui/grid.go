@@ -89,7 +89,25 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.panel = newSortPanel(m.headers, m.colCursor, m.spec.Clone())
 		return m, nil
 	case "/":
+		if m.spec.Pivot != nil {
+			m.errText = "filters are unavailable on a pivot view"
+			return m, nil
+		}
 		m.panel = newFilterPanel(m.spec.Clone())
+		return m, nil
+	case "p":
+		if m.spec.Pivot != nil {
+			m.errText = "already a pivot view, press u to go back"
+			return m, nil
+		}
+		if len(m.headers) == 0 {
+			return m, nil
+		}
+		m.pivotReq++
+		id := m.pivotReq
+		m.panel = newPivotPanel(m.headers, m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
+			return pivotCmd(m.ctx, m.sess, q, id)
+		})
 		return m, nil
 	case "f", "F":
 		if m.spec.Pivot != nil {
@@ -112,6 +130,10 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "c":
+		if m.spec.Pivot != nil {
+			m.errText = "columns are unavailable on a pivot view"
+			return m, nil
+		}
 		m.panel = newColumnsPanel(m.spec.Clone())
 		return m, nil
 	case "e":
@@ -267,6 +289,9 @@ func (m Model) renderStatus() string {
 		return m.styles.ErrorBar.Render(pad("error: "+msg, m.w))
 	}
 	parts := []string{"row " + strconv.Itoa(m.cursor+1)}
+	if m.spec.Pivot != nil {
+		parts = append(parts, "pivot: "+m.spec.Pivot.String())
+	}
 	if m.spec.Filter != "" {
 		parts = append(parts, "filter: "+m.spec.Filter)
 	}

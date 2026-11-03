@@ -1,0 +1,107 @@
+package ui
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/sv222/pivotlens/internal/engine"
+)
+
+func TestPivotPanelBuildsSpec(t *testing.T) {
+	m := gridModel(t)
+	m.spec.Sort = []engine.SortKey{{Col: "amount"}}
+	next, _ := m.Update(press("p"))
+	m = next.(Model)
+	if _, ok := m.panel.(*pivotPanel); !ok {
+		t.Fatalf("panel = %T, want *pivotPanel", m.panel)
+	}
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	for _, k := range []tea.Msg{enter, press("j"), enter, press("j"), enter, press("j"), press("j"), enter} {
+		next, _ = m.Update(k)
+		m = next.(Model)
+	}
+	if m.panel != nil {
+		t.Fatal("the last pick must close the panel")
+	}
+	p := newPivotPanel(m.headers, m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
+		return func() tea.Msg { return q }
+	})
+	var a PanelAction
+	for _, k := range []tea.Msg{enter, press("j"), enter, press("j"), enter, press("j"), press("j"), enter} {
+		_, a = p.Update(k)
+	}
+	q := a.Cmd().(engine.QuerySpec)
+	want := engine.PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"}
+	if q.Pivot == nil || !reflect.DeepEqual(*q.Pivot, want) {
+		t.Fatalf("pivot = %+v, want %+v", q.Pivot, want)
+	}
+	if q.Sort != nil {
+		t.Error("source sort must not carry into the pivot")
+	}
+}
+
+func TestPivotPanelEscGoesBack(t *testing.T) {
+	m := gridModel(t)
+	p := newPivotPanel(m.headers, m.spec.Clone(), func(engine.QuerySpec) tea.Cmd { return nil })
+	p.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if p.stage != 1 || !strings.Contains(p.View(m.styles, 80), "pivot columns") {
+		t.Fatalf("stage = %d", p.stage)
+	}
+	if _, a := p.Update(tea.KeyPressMsg{Code: tea.KeyEscape}); a.Close || p.stage != 0 {
+		t.Fatal("esc must step back a stage")
+	}
+	if _, a := p.Update(tea.KeyPressMsg{Code: tea.KeyEscape}); !a.Close {
+		t.Fatal("esc on the first stage must close")
+	}
+}
+
+func TestPivotMsgOpensPivotView(t *testing.T) {
+	m := gridModel(t)
+	m.pivotReq = 2
+	q := m.spec.Clone()
+	q.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	r, err := m.sess.ResolvePivot(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, _ := m.Update(pivotMsg{id: 1, spec: r})
+	if next.(Model).spec.Pivot != nil {
+		t.Fatal("stale pivotMsg must be ignored")
+	}
+	next, cmd := m.Update(pivotMsg{id: 2, spec: r})
+	got := next.(Model)
+	if got.spec.Pivot == nil || cmd == nil || len(got.hist) != 1 {
+		t.Fatalf("pivot not applied: %+v", got.spec.Pivot)
+	}
+	if want := "region COMPLETED FAILED PENDING"; strings.Join(got.headers, " ") != want {
+		t.Errorf("headers = %v, want %s", got.headers, want)
+	}
+	if !strings.Contains(got.renderStatus(), "pivot: region × status count") {
+		t.Errorf("status = %q", got.renderStatus())
+	}
+	for _, k := range []string{"p", "/", "c"} {
+		n, _ := got.Update(press(k))
+		if g := n.(Model); g.panel != nil || g.errText == "" {
+			t.Errorf("key %q must be refused on a pivot view", k)
+		}
+	}
+	back, _ := got.Update(press("u"))
+	if back.(Model).spec.Pivot != nil {
+		t.Error("undo must leave the pivot view")
+	}
+}
+
+func TestPivotMsgErrorShown(t *testing.T) {
+	m := gridModel(t)
+	m.pivotReq = 1
+	next, _ := m.Update(pivotMsg{id: 1, err: errors.New("too many pivot columns")})
+	got := next.(Model)
+	if got.spec.Pivot != nil || !strings.Contains(got.renderStatus(), "too many pivot columns") {
+		t.Errorf("status = %q", got.renderStatus())
+	}
+}
