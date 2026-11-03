@@ -14,6 +14,7 @@ var pivotStages = []string{"rows", "columns", "aggregate", "values"}
 
 type pivotPanel struct {
 	headers []string
+	numeric map[string]bool
 	spec    engine.QuerySpec
 	run     func(engine.QuerySpec) tea.Cmd
 	stage   int
@@ -21,8 +22,8 @@ type pivotPanel struct {
 	picks   [4]string
 }
 
-func newPivotPanel(headers []string, spec engine.QuerySpec, run func(engine.QuerySpec) tea.Cmd) *pivotPanel {
-	return &pivotPanel{headers: headers, spec: spec, run: run}
+func newPivotPanel(headers []string, numeric map[string]bool, spec engine.QuerySpec, run func(engine.QuerySpec) tea.Cmd) *pivotPanel {
+	return &pivotPanel{headers: headers, numeric: numeric, spec: spec, run: run}
 }
 
 func (p *pivotPanel) options() []string {
@@ -40,8 +41,17 @@ func (p *pivotPanel) options() []string {
 	case 2:
 		return engine.PivotAggs
 	}
-	if p.picks[2] == "count" {
+	switch p.picks[2] {
+	case "count":
 		return append([]string{noField}, p.headers...)
+	case "sum", "avg":
+		var out []string
+		for _, h := range p.headers {
+			if p.numeric[h] {
+				out = append(out, h)
+			}
+		}
+		return out
 	}
 	return p.headers
 }
@@ -98,7 +108,11 @@ func (p *pivotPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 func (p *pivotPanel) View(s Styles, w int) string {
 	var b strings.Builder
 	b.WriteString("pivot " + pivotStages[p.stage] + ": ")
-	for i, o := range p.options() {
+	opts := p.options()
+	if len(opts) == 0 {
+		b.WriteString(" no numeric fields ")
+	}
+	for i, o := range opts {
 		if i == p.idx {
 			b.WriteString(s.Cursor.Render(" " + o + " "))
 		} else {

@@ -105,7 +105,7 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.pivotReq++
 		id := m.pivotReq
-		m.panel = newPivotPanel(m.headers, m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
+		m.panel = newPivotPanel(m.headers, m.sess.NumericFields(m.spec), m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
 			return pivotCmd(m.ctx, m.sess, q, id)
 		})
 		return m, nil

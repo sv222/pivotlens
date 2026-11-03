@@ -27,6 +27,18 @@ func numericType(t string) bool {
 		t == "DOUBLE" || t == "REAL"
 }
 
+func (s *Session) NumericFields(q QuerySpec) map[string]bool {
+	out := make(map[string]bool)
+	for _, c := range q.Visible() {
+		t := c.Cast
+		if t == "" {
+			t = s.colType(c.Name)
+		}
+		out[c.Display()] = numericType(strings.ToUpper(t))
+	}
+	return out
+}
+
 func (q QuerySpec) StatsSQL(col string, numeric bool) (string, error) {
 	if q.Pivot != nil {
 		return "", ErrPivotStats

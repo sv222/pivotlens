@@ -28,7 +28,7 @@ func TestPivotPanelBuildsSpec(t *testing.T) {
 	if m.panel != nil {
 		t.Fatal("the last pick must close the panel")
 	}
-	p := newPivotPanel(m.headers, m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
+	p := newPivotPanel(m.headers, m.sess.NumericFields(m.spec), m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
 		return func() tea.Msg { return q }
 	})
 	var a PanelAction
@@ -47,7 +47,7 @@ func TestPivotPanelBuildsSpec(t *testing.T) {
 
 func TestPivotPanelEscGoesBack(t *testing.T) {
 	m := gridModel(t)
-	p := newPivotPanel(m.headers, m.spec.Clone(), func(engine.QuerySpec) tea.Cmd { return nil })
+	p := newPivotPanel(m.headers, m.sess.NumericFields(m.spec), m.spec.Clone(), func(engine.QuerySpec) tea.Cmd { return nil })
 	p.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if p.stage != 1 || !strings.Contains(p.View(m.styles, 80), "pivot columns") {
 		t.Fatalf("stage = %d", p.stage)
@@ -103,5 +103,26 @@ func TestPivotMsgErrorShown(t *testing.T) {
 	got := next.(Model)
 	if got.spec.Pivot != nil || !strings.Contains(got.renderStatus(), "too many pivot columns") {
 		t.Errorf("status = %q", got.renderStatus())
+	}
+}
+
+func TestPivotPanelSumAvgOfferNumericFieldsOnly(t *testing.T) {
+	m := gridModel(t)
+	p := newPivotPanel(m.headers, m.sess.NumericFields(m.spec), m.spec.Clone(), func(engine.QuerySpec) tea.Cmd { return nil })
+	for _, agg := range []string{"sum", "avg"} {
+		p.stage, p.picks[2] = 3, agg
+		if got := p.options(); !reflect.DeepEqual(got, []string{"amount"}) {
+			t.Errorf("%s options = %v, want [amount]", agg, got)
+		}
+	}
+	for _, agg := range []string{"min", "max"} {
+		p.picks[2] = agg
+		if got := p.options(); !reflect.DeepEqual(got, m.headers) {
+			t.Errorf("%s options = %v, want all headers", agg, got)
+		}
+	}
+	p.picks[2] = "count"
+	if got := p.options(); len(got) != len(m.headers)+1 || got[0] != noField {
+		t.Errorf("count options = %v", got)
 	}
 }
