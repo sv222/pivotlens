@@ -33,6 +33,8 @@ type PivotSpec struct {
 	On     string
 	Agg    string
 	AggCol string
+	Values []string
+	Null   bool
 }
 
 type QuerySpec struct {
@@ -71,6 +73,7 @@ func (q QuerySpec) Clone() QuerySpec {
 	if q.Pivot != nil {
 		p := *q.Pivot
 		p.Rows = append([]string(nil), q.Pivot.Rows...)
+		p.Values = append([]string(nil), q.Pivot.Values...)
 		n.Pivot = &p
 	}
 	return n

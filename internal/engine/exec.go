@@ -3,7 +3,9 @@ package engine
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"errors"
+	"io"
 )
 
 const WidthSample = 1000
@@ -105,4 +107,49 @@ func (s *Session) Export(ctx context.Context, q QuerySpec, path, format string) 
 	}
 	_, err = s.db.ExecContext(ctx, text)
 	return err
+}
+
+func (s *Session) WriteCSV(ctx context.Context, q QuerySpec, w io.Writer) error {
+	text, err := q.SQL()
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.QueryContext(ctx, text)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	cols, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	cw := csv.NewWriter(w)
+	if err := cw.Write(cols); err != nil {
+		return err
+	}
+	vals := make([]any, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	rec := make([]string, len(cols))
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			return err
+		}
+		for i, v := range vals {
+			rec[i] = ""
+			if v != nil {
+				rec[i] = FormatValue(v)
+			}
+		}
+		if err := cw.Write(rec); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	cw.Flush()
+	return cw.Error()
 }

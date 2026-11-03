@@ -209,26 +209,41 @@ func TestWidthsSQL(t *testing.T) {
 
 func TestPivotSQL(t *testing.T) {
 	q := demoSpec()
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Agg: "sum", AggCol: "amount"}
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, On: "amount", Agg: "sum", AggCol: "amount", Values: []string{"1", "it's"}, Null: true}
 	got, err := q.PageSQL(100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := demoPrefix + `PIVOT filtered ON "amount" USING sum("amount") GROUP BY "region" LIMIT 100 OFFSET 0`
+	want := demoPrefix + `SELECT * FROM (SELECT "region", ` +
+		`sum("amount") FILTER (WHERE CAST("amount" AS VARCHAR) = '1') AS "1", ` +
+		`sum("amount") FILTER (WHERE CAST("amount" AS VARCHAR) = 'it''s') AS "it's", ` +
+		`sum("amount") FILTER (WHERE "amount" IS NULL) AS "NULL" ` +
+		`FROM filtered GROUP BY "region") ORDER BY "region" LIMIT 100 OFFSET 0`
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
 
-func TestPivotRequiresRowsAndOn(t *testing.T) {
+func TestPivotSQLWithoutColumnField(t *testing.T) {
+	q := demoSpec()
+	q.Pivot = &PivotSpec{Rows: []string{"region"}, Agg: "count"}
+	q.Sort = []SortKey{{Col: "count", Desc: true}}
+	got, err := q.PageSQL(10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := demoPrefix + `SELECT * FROM (SELECT "region", count(*) AS "count" ` +
+		`FROM filtered GROUP BY "region") ORDER BY "count" DESC LIMIT 10 OFFSET 0`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestPivotRequiresRows(t *testing.T) {
 	q := demoSpec()
 	q.Pivot = &PivotSpec{On: "amount", Agg: "count"}
 	if _, err := q.PageSQL(1, 0); err == nil {
-		t.Error("pivot without row groups must fail")
-	}
-	q.Pivot = &PivotSpec{Rows: []string{"region"}, Agg: "count"}
-	if _, err := q.PageSQL(1, 0); err == nil {
-		t.Error("pivot without a pivot column must fail")
+		t.Error("pivot without a row field must fail")
 	}
 }
 
