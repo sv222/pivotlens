@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -13,7 +14,10 @@ const PivotLimit = 50
 
 var PivotAggs = []string{"count", "sum", "avg", "min", "max"}
 
-const EmptyText = "(empty)"
+const (
+	EmptyText = "(empty)"
+	TotalText = "Total"
+)
 
 var ErrPivotLimit = errors.New("too many pivot columns")
 
@@ -22,6 +26,7 @@ type pivotCol struct {
 	key   string
 	keyed bool
 	null  bool
+	total bool
 	m     int
 }
 
@@ -32,7 +37,7 @@ func (m Measure) Label() string {
 	return m.Agg + "(" + m.Col + ")"
 }
 
-func (p PivotSpec) layout() []pivotCol {
+func (p PivotSpec) layout() ([]pivotCol, string) {
 	seen := make(map[string]bool)
 	for _, r := range p.Rows {
 		seen[strings.ToLower(r)] = true
@@ -46,41 +51,47 @@ func (p PivotSpec) layout() []pivotCol {
 		return name
 	}
 	var out []pivotCol
-	if p.On == "" {
-		for i, m := range p.Measures {
-			out = append(out, pivotCol{name: unique(m.Label()), m: i})
-		}
-		return out
-	}
-	add := func(key string, null bool) {
-		base := key
-		switch {
-		case null:
-			base = NullText
-		case key == "":
-			base = EmptyText
-		}
+	add := func(base string, c pivotCol) {
 		for i, m := range p.Measures {
 			name := base
 			if len(p.Measures) > 1 {
 				name += " " + m.Label()
 			}
-			out = append(out, pivotCol{name: unique(name), key: key, keyed: !null, null: null, m: i})
+			if base == "" {
+				name = m.Label()
+			}
+			c.name, c.m = unique(name), i
+			out = append(out, c)
 		}
 	}
+	if p.On == "" {
+		add("", pivotCol{})
+	}
 	for _, k := range p.Keys {
-		add(k, false)
+		base := k
+		if k == "" {
+			base = EmptyText
+		}
+		add(base, pivotCol{key: k, keyed: true})
 	}
 	if p.Null {
-		add("", true)
+		add(NullText, pivotCol{null: true})
 	}
-	return out
+	add(TotalText, pivotCol{total: true})
+	return out, unique("grouping")
+}
+
+func (p PivotSpec) shown(c pivotCol) bool {
+	return !c.total || p.Totals && p.On != ""
 }
 
 func (p PivotSpec) Columns() []string {
 	out := append([]string(nil), p.Rows...)
-	for _, c := range p.layout() {
-		out = append(out, c.name)
+	cs, _ := p.layout()
+	for _, c := range cs {
+		if p.shown(c) {
+			out = append(out, c.name)
+		}
 	}
 	return out
 }
@@ -94,7 +105,11 @@ func (p PivotSpec) String() string {
 	for i, m := range p.Measures {
 		ls[i] = m.Label()
 	}
-	return s + " " + strings.Join(ls, ", ")
+	s += " " + strings.Join(ls, ", ")
+	if p.Totals {
+		s += " with totals"
+	}
+	return s
 }
 
 func parseMeasure(item, agg string) Measure {
@@ -133,8 +148,14 @@ func ParsePivot(s string) (PivotSpec, error) {
 			items = append(items, v)
 		case "agg":
 			agg = strings.ToLower(v)
+		case "totals":
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return p, fmt.Errorf("pivot: totals %q, want true or false", v)
+			}
+			p.Totals = b
 		default:
-			return p, fmt.Errorf("pivot: unknown key %q, want rows, cols, values or agg", k)
+			return p, fmt.Errorf("pivot: unknown key %q, want rows, cols, values, agg or totals", k)
 		}
 	}
 	if len(p.Rows) == 0 {
@@ -174,13 +195,20 @@ func (q QuerySpec) pivotBody() (string, error) {
 		aggs[i] = e
 	}
 	rs := make([]string, len(p.Rows))
+	pr := make([]string, len(p.Rows))
 	for i, r := range p.Rows {
 		rs[i] = qi(r)
+		pr[i] = "p." + rs[i]
 	}
 	rows := strings.Join(rs, ", ")
+	out := append([]string(nil), pr...)
+	cs, g := p.layout()
 	sel := []string{rows}
 	on := qi(p.On)
-	for _, c := range p.layout() {
+	for _, c := range cs {
+		if !p.shown(c) {
+			continue
+		}
 		e := aggs[c.m]
 		switch {
 		case c.keyed:
@@ -189,13 +217,28 @@ func (q QuerySpec) pivotBody() (string, error) {
 			e += " FILTER (WHERE " + on + " IS NULL)"
 		}
 		sel = append(sel, e+" AS "+qi(c.name))
+		out = append(out, "p."+qi(c.name))
 	}
-	order := q.orderBy()
-	if order == "" {
-		order = " ORDER BY " + rows
+	group := rows
+	var order []string
+	if p.Totals {
+		group = "GROUPING SETS ((" + rows + "), ())"
+		sel = append(sel, "grouping("+rows+") AS "+qi(g))
+		out[0] = "CASE WHEN p." + qi(g) + " <> 0 THEN " + ql(TotalText) + " ELSE CAST(" + pr[0] + " AS VARCHAR) END AS " + rs[0]
+		order = append(order, "p."+qi(g))
 	}
-	return "SELECT * FROM (SELECT " + strings.Join(sel, ", ") +
-		" FROM filtered GROUP BY " + rows + ")" + order, nil
+	for _, k := range q.Sort {
+		dir := " ASC"
+		if k.Desc {
+			dir = " DESC"
+		}
+		order = append(order, "p."+qi(k.Col)+dir)
+	}
+	if len(q.Sort) == 0 {
+		order = append(order, pr...)
+	}
+	return "SELECT " + strings.Join(out, ", ") + " FROM (SELECT " + strings.Join(sel, ", ") +
+		" FROM filtered GROUP BY " + group + ") p ORDER BY " + strings.Join(order, ", "), nil
 }
 
 func (q QuerySpec) pivotValuesSQL() (string, error) {

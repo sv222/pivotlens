@@ -214,11 +214,11 @@ func TestPivotSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := demoPrefix + `SELECT * FROM (SELECT "region", ` +
+	want := demoPrefix + `SELECT p."region", p."1", p."it's", p."NULL" FROM (SELECT "region", ` +
 		`sum("amount") FILTER (WHERE CAST("amount" AS VARCHAR) = '1') AS "1", ` +
 		`sum("amount") FILTER (WHERE CAST("amount" AS VARCHAR) = 'it''s') AS "it's", ` +
 		`sum("amount") FILTER (WHERE "amount" IS NULL) AS "NULL" ` +
-		`FROM filtered GROUP BY "region") ORDER BY "region" LIMIT 100 OFFSET 0`
+		`FROM filtered GROUP BY "region") p ORDER BY p."region" LIMIT 100 OFFSET 0`
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
@@ -232,8 +232,8 @@ func TestPivotSQLWithoutColumnField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := demoPrefix + `SELECT * FROM (SELECT "region", count(*) AS "count" ` +
-		`FROM filtered GROUP BY "region") ORDER BY "count" DESC LIMIT 10 OFFSET 0`
+	want := demoPrefix + `SELECT p."region", p."count" FROM (SELECT "region", count(*) AS "count" ` +
+		`FROM filtered GROUP BY "region") p ORDER BY p."count" DESC LIMIT 10 OFFSET 0`
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
