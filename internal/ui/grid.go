@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -163,6 +164,11 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, statsCmd(m.ctx, m.sess, m.spec, m.metaName(col), m.statsReq)
 	case "t":
 		return m.repivot(func(p *engine.PivotSpec) { p.Totals = !p.Totals })
+	case "%":
+		return m.repivot(func(p *engine.PivotSpec) {
+			modes := append([]string{""}, engine.PivotPercents...)
+			p.Percent = modes[(slices.Index(modes, p.Percent)+1)%len(modes)]
+		})
 	case "u":
 		return m.undo()
 	}

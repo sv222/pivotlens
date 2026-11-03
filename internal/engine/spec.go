@@ -38,6 +38,7 @@ type PivotSpec struct {
 	On       string
 	Measures []Measure
 	Totals   bool
+	Percent  string
 	Keys     []string
 	Null     bool
 }
