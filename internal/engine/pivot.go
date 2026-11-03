@@ -17,11 +17,44 @@ const EmptyText = "(empty)"
 
 var ErrPivotLimit = errors.New("too many pivot columns")
 
-func pivotLabel(v string) string {
-	if v == "" {
-		return EmptyText
+func pivotAliases(taken []string, names []string, nullCol bool) ([]string, string) {
+	seen := make(map[string]bool, len(taken)+len(names)+1)
+	for _, t := range taken {
+		seen[strings.ToLower(t)] = true
 	}
-	return v
+	unique := func(base string) string {
+		name := base
+		for i := 1; seen[strings.ToLower(name)]; i++ {
+			name = base + "_" + itoa(i)
+		}
+		seen[strings.ToLower(name)] = true
+		return name
+	}
+	out := make([]string, len(names))
+	for i, n := range names {
+		if n == "" {
+			n = EmptyText
+		}
+		out[i] = unique(n)
+	}
+	if !nullCol {
+		return out, ""
+	}
+	return out, unique(NullText)
+}
+
+func (p PivotSpec) keys() []string {
+	if len(p.Keys) == len(p.Values) {
+		return p.Keys
+	}
+	return p.Values
+}
+
+func (p PivotSpec) nullCol() string {
+	if p.NullCol == "" {
+		return NullText
+	}
+	return p.NullCol
 }
 
 func (p PivotSpec) Label() string {
@@ -36,11 +69,9 @@ func (p PivotSpec) Columns() []string {
 	if p.On == "" {
 		return append(out, p.Label())
 	}
-	for _, v := range p.Values {
-		out = append(out, pivotLabel(v))
-	}
+	out = append(out, p.Values...)
 	if p.Null {
-		out = append(out, NullText)
+		out = append(out, p.nullCol())
 	}
 	return out
 }
@@ -105,11 +136,12 @@ func (q QuerySpec) pivotBody() (string, error) {
 		sel = append(sel, agg+" AS "+qi(p.Label()))
 	} else {
 		on := qi(p.On)
-		for _, v := range p.Values {
-			sel = append(sel, agg+" FILTER (WHERE CAST("+on+" AS VARCHAR) = "+ql(v)+") AS "+qi(pivotLabel(v)))
+		keys := p.keys()
+		for i, v := range p.Values {
+			sel = append(sel, agg+" FILTER (WHERE CAST("+on+" AS VARCHAR) = "+ql(keys[i])+") AS "+qi(v))
 		}
 		if p.Null {
-			sel = append(sel, agg+" FILTER (WHERE "+on+" IS NULL) AS "+qi(NullText))
+			sel = append(sel, agg+" FILTER (WHERE "+on+" IS NULL) AS "+qi(p.nullCol()))
 		}
 	}
 	order := q.orderBy()
@@ -141,7 +173,7 @@ func (s *Session) ResolvePivot(ctx context.Context, q QuerySpec) (QuerySpec, err
 			return q, fmt.Errorf("unknown column %q", c)
 		}
 	}
-	p.Values, p.Null = nil, false
+	p.Keys, p.Values, p.Null, p.NullCol = nil, nil, false, ""
 	if p.On != "" {
 		text, err := q.pivotValuesSQL()
 		if err != nil {
@@ -162,7 +194,7 @@ func (s *Session) ResolvePivot(ctx context.Context, q QuerySpec) (QuerySpec, err
 				return q, fmt.Errorf("%w: %s has more than %d distinct values, pick a column field with fewer", ErrPivotLimit, p.On, PivotLimit)
 			}
 			if v.Valid {
-				p.Values = append(p.Values, v.String)
+				p.Keys = append(p.Keys, v.String)
 			} else {
 				p.Null = true
 			}
@@ -170,6 +202,7 @@ func (s *Session) ResolvePivot(ctx context.Context, q QuerySpec) (QuerySpec, err
 		if err := rows.Err(); err != nil {
 			return q, err
 		}
+		p.Values, p.NullCol = pivotAliases(p.Rows, p.Keys, p.Null)
 	}
 	_, err := q.SQL()
 	return q, err

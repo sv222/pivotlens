@@ -245,3 +245,39 @@ func TestPivotEmptyStringColumnValue(t *testing.T) {
 		t.Errorf("rows = %v, want %v", rows, want)
 	}
 }
+
+func TestPivotAliases(t *testing.T) {
+	names, null := pivotAliases([]string{"region"}, []string{"NULL", "OK", "ok", "region", "", "(empty)"}, true)
+	want := []string{"NULL", "OK", "ok_1", "region_1", "(empty)", "(empty)_1"}
+	if !reflect.DeepEqual(names, want) || null != "NULL_1" {
+		t.Errorf("names = %v null = %q, want %v NULL_1", names, null, want)
+	}
+	if names, null := pivotAliases(nil, []string{"a"}, false); null != "" || !reflect.DeepEqual(names, []string{"a"}) {
+		t.Errorf("names = %v null = %q", names, null)
+	}
+}
+
+func TestPivotCollidingColumnValues(t *testing.T) {
+	s := openNDJSON(t, `{"region":"EU","status":"ok","amount":1}
+{"region":"EU","status":"OK","amount":2}
+{"region":"US","status":"region","amount":4}
+{"region":"US","status":"NULL","amount":8}
+{"region":"US","status":null,"amount":16}
+{"region":"US","status":"ok","amount":32}
+`)
+	q := NewSpec(s.Columns())
+	q.Sort = []SortKey{{Col: "ok_1", Desc: true}}
+	cols, rows := pivotRows(t, s, q,
+		PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"})
+	wantCols := []string{"region", "NULL", "OK", "ok_1", "region_1", "NULL_1"}
+	if !reflect.DeepEqual(cols, wantCols) {
+		t.Fatalf("cols = %v, want %v", cols, wantCols)
+	}
+	want := [][]string{
+		{"US", "8", "NULL", "32", "4", "16"},
+		{"EU", "NULL", "2", "1", "NULL", "NULL"},
+	}
+	if !reflect.DeepEqual(rows, want) {
+		t.Errorf("rows = %v, want %v", rows, want)
+	}
+}
