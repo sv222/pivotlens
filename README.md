@@ -144,9 +144,9 @@ values, columns are named `<column value> <label>`, such as
 is a column field, a total column per value. Totals are aggregates over all
 rows, so an average total is the average of every row. `%` cycles the
 values through percent of row, percent of column, percent of grand total,
-and back to plain values, rounded to 2 decimals. Percent needs numeric
-values (`count`, or `sum`, `avg`, `min` or `max` of a numeric field);
-otherwise pivotlens refuses with a message.
+and back to plain values, rounded to 2 decimals. Percent works with
+`count` and `sum` only, and `sum` needs a numeric field; otherwise pivotlens
+refuses with a message.
 
 The same pivot from the command line, for scripts:
 
@@ -184,6 +184,8 @@ millions of rows. A column field may have at most 50 distinct values;
 past that, pivotlens refuses and asks for a field with fewer values. Rows
 or columns whose field is NULL show up as `NULL` in the grid and as an empty field in CSV
 export. An empty string in the column field is labeled `(empty)`.
+With totals on, the first row field is exported as text, so the `Total`
+label fits in the same column.
 
 ## How it works
 
