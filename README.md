@@ -102,7 +102,7 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 |---|---|
 | `-v`, `--version` | print the version and exit |
 | `--pivot spec` | print a pivot table as CSV and exit, see [Pivot tables](#pivot-tables) |
-| `-o`, `--output file` | with `--pivot`, write to a `.csv` or `.parquet` file instead of stdout |
+| `-o`, `--output file` | with `--pivot`, write to a `.csv`, `.parquet` or `.ndjson` file instead of stdout |
 
 | Key | Effect |
 |---|---|
@@ -116,9 +116,11 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 | `s` | open sort on the current column, `a` ascending, `d` descending, `x` clears, `esc` cancels |
 | `u` | undo the last applied sort or filter |
 | `c` | manage columns: `space` hides, `J`/`K` reorder, `r` renames, `enter` applies, `esc` discards |
-| `e` | export the current view to a `.csv` or `.parquet` file |
+| `e` | export the current view to a `.csv`, `.parquet` or `.ndjson` file |
 | `i` | show statistics for the current column over the filtered view |
-| `p` | build a pivot table: pick rows, columns, aggregate and values with `j`/`k` and `enter`, `esc` steps back |
+| `p` | build a pivot table: pick rows, columns, aggregates and values with `j`/`k` and `enter`, `add value` adds another value, `esc` steps back |
+| `t` | on a pivot view, toggle the grand total row and total columns |
+| `%` | on a pivot view, cycle values as percent of row, of column, of grand total, then plain |
 | `q`, `ctrl+c` | quit |
 
 ## Pivot tables
@@ -129,10 +131,22 @@ Press `p` in the grid and pick, one step at a time:
 2. a column field, such as `status`, or `(none)` for one value per row
 3. an aggregate: `count`, `sum`, `avg`, `min` or `max`
 4. a value field, such as `amount` (`count` also accepts `(none)` to count rows)
+5. `done`, or `add value` to repeat steps 3 and 4 for another value; `esc`
+   on this step removes the last value
 
 The pivot opens as a new grid. Scroll, sort (`s`) and export (`e`) work as
 in the main view; `u` goes back to the data. Active filters apply to the
-pivot, so filter first to pivot a subset.
+pivot, so filter first to pivot a subset. With a column field and several
+values, columns are named `<column value> <label>`, such as
+`COMPLETED sum(amount)` and `COMPLETED count`.
+
+`t` toggles totals: a `Total` row that always stays last, and, when there
+is a column field, a total column per value. Totals are aggregates over all
+rows, so an average total is the average of every row. `%` cycles the
+values through percent of row, percent of column, percent of grand total,
+and back to plain values, rounded to 2 decimals. Percent needs numeric
+values (`count`, or `sum`, `avg`, `min` or `max` of a numeric field);
+otherwise pivotlens refuses with a message.
 
 The same pivot from the command line, for scripts:
 
@@ -145,10 +159,27 @@ US-EAST,1420.5,,
 US-WEST,,,9120
 ```
 
-`cols` and `values` are optional, `agg` defaults to `count`. Add
-`-o pivot.parquet` to write a file instead of printing.
+With several values and totals:
 
-DuckDB computes the pivot with one `GROUP BY` query, so it stays fast on
+```
+$ pivotlens --pivot rows=region,cols=status,values=amount:sum,*:count,totals=true testdata/tiny.csv
+region,COMPLETED sum(amount),COMPLETED count,FAILED sum(amount),FAILED count,PENDING sum(amount),PENDING count,Total sum(amount),Total count
+AP-SOUTH,312.25,1,,0,,0,312.25,1
+EU-CENT,12.5,1,84,1,,0,96.5,2
+US-EAST,1420.5,1,,0,,0,1420.5,1
+US-WEST,,0,,0,9120,1,9120,1
+Total,1745.25,3,84,1,9120,1,10949.25,5
+```
+
+`values=field:agg,...` lists the value fields with their aggregates, and
+`*:count` counts rows. A bare field in `values` uses `agg=`. `totals=true`
+adds the `Total` row and columns, and `percent=row|col|total` shows values
+as a percent of row, of column or of the grand total. `cols`, `values`,
+`totals` and `percent` are optional, and `agg` defaults to `count`. Add
+`-o pivot.csv`, `-o pivot.parquet` or `-o pivot.ndjson` to write a file
+instead of printing.
+
+DuckDB computes the pivot, totals included, in SQL, so it stays fast on
 millions of rows. A column field may have at most 50 distinct values;
 past that, pivotlens refuses and asks for a field with fewer values. Rows
 or columns whose field is NULL show up as `NULL` in the grid and as an empty field in CSV
