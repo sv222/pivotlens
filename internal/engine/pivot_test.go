@@ -358,7 +358,7 @@ func TestPivotSeveralValues(t *testing.T) {
 }
 
 func TestParsePivotSeveralValues(t *testing.T) {
-	p, err := ParsePivot("rows=region,values=amount:sum, amount:AVG,*:count,a:b,cols=status")
+	p, err := ParsePivot("rows=region,values=amount:sum, amount: AVG,*:count,a:b,cols=status")
 	if err != nil {
 		t.Fatal(err)
 	}
