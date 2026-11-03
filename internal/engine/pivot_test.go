@@ -524,6 +524,14 @@ func TestPivotPercentNeedsNumbers(t *testing.T) {
 	if _, err := s.ResolvePivot(context.Background(), q); err == nil {
 		t.Error("percent of a text value must fail")
 	}
+	q.Pivot = &PivotSpec{Rows: []string{"status"}, Percent: "row", Measures: []Measure{{Agg: "avg", Col: "amount"}}}
+	if _, err := s.ResolvePivot(context.Background(), q); err == nil {
+		t.Error("percent of avg must fail")
+	}
+	q.Pivot = &PivotSpec{Rows: []string{"status"}, Percent: "row", Measures: []Measure{{Agg: "max", Col: "amount"}}}
+	if _, err := s.ResolvePivot(context.Background(), q); err == nil {
+		t.Error("percent of max must fail")
+	}
 	q.Pivot.Percent = "half"
 	if _, err := q.SQL(); err == nil {
 		t.Error("unknown percent must fail")
