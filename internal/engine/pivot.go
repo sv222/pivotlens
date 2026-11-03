@@ -14,6 +14,8 @@ const PivotLimit = 50
 
 var PivotAggs = []string{"count", "sum", "avg", "min", "max"}
 
+var PercentAggs = []string{"count", "sum"}
+
 var PivotPercents = []string{"row", "col", "total"}
 
 var percentText = map[string]string{"row": "row", "col": "column", "total": "grand total"}
@@ -315,6 +317,9 @@ func (s *Session) ResolvePivot(ctx context.Context, q QuerySpec) (QuerySpec, err
 	if p.Percent != "" {
 		num := s.NumericFields(q)
 		for _, m := range p.Measures {
+			if !slices.Contains(PercentAggs, m.Agg) {
+				return q, fmt.Errorf("percent works with %s only, %s is not allowed", strings.Join(PercentAggs, " and "), m.Label())
+			}
 			if m.Agg != "count" && !num[m.Col] {
 				return q, fmt.Errorf("percent needs numeric values, %s is not", m.Label())
 			}

@@ -165,6 +165,14 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "t":
 		return m.repivot(func(p *engine.PivotSpec) { p.Totals = !p.Totals })
 	case "%":
+		if m.spec.Pivot != nil {
+			for _, v := range m.spec.Pivot.Measures {
+				if !slices.Contains(engine.PercentAggs, v.Agg) {
+					m.errText = "percent works with count and sum only"
+					return m, nil
+				}
+			}
+		}
 		return m.repivot(func(p *engine.PivotSpec) {
 			modes := append([]string{""}, engine.PivotPercents...)
 			p.Percent = modes[(slices.Index(modes, p.Percent)+1)%len(modes)]
