@@ -14,6 +14,10 @@ const PivotLimit = 50
 
 var PivotAggs = []string{"count", "sum", "avg", "min", "max"}
 
+var PivotPercents = []string{"row", "col", "total"}
+
+var percentText = map[string]string{"row": "row", "col": "column", "total": "grand total"}
+
 const (
 	EmptyText = "(empty)"
 	TotalText = "Total"
@@ -109,6 +113,9 @@ func (p PivotSpec) String() string {
 	if p.Totals {
 		s += " with totals"
 	}
+	if p.Percent != "" {
+		s += " as % of " + percentText[p.Percent]
+	}
 	return s
 }
 
@@ -154,8 +161,13 @@ func ParsePivot(s string) (PivotSpec, error) {
 				return p, fmt.Errorf("pivot: totals %q, want true or false", v)
 			}
 			p.Totals = b
+		case "percent":
+			if !slices.Contains(PivotPercents, v) {
+				return p, fmt.Errorf("pivot: percent %q, want one of %s", v, strings.Join(PivotPercents, ", "))
+			}
+			p.Percent = v
 		default:
-			return p, fmt.Errorf("pivot: unknown key %q, want rows, cols, values, agg or totals", k)
+			return p, fmt.Errorf("pivot: unknown key %q, want rows, cols, values, agg, totals or percent", k)
 		}
 	}
 	if len(p.Rows) == 0 {
@@ -203,10 +215,20 @@ func (q QuerySpec) pivotBody() (string, error) {
 	rows := strings.Join(rs, ", ")
 	out := append([]string(nil), pr...)
 	cs, g := p.layout()
+	gq := qi(g)
+	grand := p.Totals || p.Percent == "col" || p.Percent == "total"
 	sel := []string{rows}
+	mid := []string{rows}
+	tot := make([]string, len(p.Measures))
+	for _, c := range cs {
+		if c.total {
+			tot[c.m] = qi(c.name)
+		}
+	}
 	on := qi(p.On)
 	for _, c := range cs {
-		if !p.shown(c) {
+		n := qi(c.name)
+		if !p.shown(c) && !(c.total && p.Percent != "") {
 			continue
 		}
 		e := aggs[c.m]
@@ -216,16 +238,31 @@ func (q QuerySpec) pivotBody() (string, error) {
 		case c.null:
 			e += " FILTER (WHERE " + on + " IS NULL)"
 		}
-		sel = append(sel, e+" AS "+qi(c.name))
-		out = append(out, "p."+qi(c.name))
+		sel = append(sel, e+" AS "+n)
+		den := tot[c.m]
+		switch p.Percent {
+		case "col":
+			den = "max(CASE WHEN " + gq + " <> 0 THEN " + n + " END) OVER ()"
+		case "total":
+			den = "max(CASE WHEN " + gq + " <> 0 THEN " + tot[c.m] + " END) OVER ()"
+		}
+		mid = append(mid, "round(100.0 * "+n+" / nullif("+den+", 0), 2) AS "+n)
+		if p.shown(c) {
+			out = append(out, "p."+n)
+		}
 	}
-	group := rows
+	group, where := rows, ""
 	var order []string
-	if p.Totals {
+	if grand {
 		group = "GROUPING SETS ((" + rows + "), ())"
-		sel = append(sel, "grouping("+rows+") AS "+qi(g))
-		out[0] = "CASE WHEN p." + qi(g) + " <> 0 THEN " + ql(TotalText) + " ELSE CAST(" + pr[0] + " AS VARCHAR) END AS " + rs[0]
-		order = append(order, "p."+qi(g))
+		sel = append(sel, "grouping("+rows+") AS "+gq)
+		mid = append(mid, gq)
+		where = " WHERE p." + gq + " = 0"
+	}
+	if p.Totals {
+		out[0] = "CASE WHEN p." + gq + " <> 0 THEN " + ql(TotalText) + " ELSE CAST(" + pr[0] + " AS VARCHAR) END AS " + rs[0]
+		order = append(order, "p."+gq)
+		where = ""
 	}
 	for _, k := range q.Sort {
 		dir := " ASC"
@@ -237,8 +274,15 @@ func (q QuerySpec) pivotBody() (string, error) {
 	if len(q.Sort) == 0 {
 		order = append(order, pr...)
 	}
-	return "SELECT " + strings.Join(out, ", ") + " FROM (SELECT " + strings.Join(sel, ", ") +
-		" FROM filtered GROUP BY " + group + ") p ORDER BY " + strings.Join(order, ", "), nil
+	from := "SELECT " + strings.Join(sel, ", ") + " FROM filtered GROUP BY " + group
+	switch {
+	case p.Percent != "" && !slices.Contains(PivotPercents, p.Percent):
+		return "", fmt.Errorf("unsupported percent %q", p.Percent)
+	case p.Percent != "":
+		from = "SELECT " + strings.Join(mid, ", ") + " FROM (" + from + ")"
+	}
+	return "SELECT " + strings.Join(out, ", ") + " FROM (" + from + ") p" + where +
+		" ORDER BY " + strings.Join(order, ", "), nil
 }
 
 func (q QuerySpec) pivotValuesSQL() (string, error) {
@@ -265,6 +309,14 @@ func (s *Session) ResolvePivot(ctx context.Context, q QuerySpec) (QuerySpec, err
 	for _, c := range cols {
 		if c != "" && !slices.Contains(names, c) {
 			return q, fmt.Errorf("unknown column %q", c)
+		}
+	}
+	if p.Percent != "" {
+		num := s.NumericFields(q)
+		for _, m := range p.Measures {
+			if m.Agg != "count" && !num[m.Col] {
+				return q, fmt.Errorf("percent needs numeric values, %s is not", m.Label())
+			}
 		}
 	}
 	p.Keys, p.Null = nil, false

@@ -191,3 +191,17 @@ func TestTotalsKeyTogglesTotals(t *testing.T) {
 		t.Error("second t must turn totals off")
 	}
 }
+
+func TestPercentKeyCyclesModes(t *testing.T) {
+	m := pivotModel(t)
+	for _, want := range []string{"row", "col", "total", ""} {
+		m = runPivotKey(t, m, "%")
+		if m.spec.Pivot.Percent != want {
+			t.Fatalf("percent = %q, want %q", m.spec.Pivot.Percent, want)
+		}
+	}
+	m = runPivotKey(t, m, "%")
+	if !strings.Contains(m.renderStatus(), "as % of row") {
+		t.Errorf("status = %q", m.renderStatus())
+	}
+}

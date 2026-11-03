@@ -450,10 +450,82 @@ func TestPivotTotalsSortedAndExported(t *testing.T) {
 }
 
 func TestParsePivotTotals(t *testing.T) {
-	if p, err := ParsePivot("rows=r,totals=true"); err != nil || !p.Totals {
+	if p, err := ParsePivot("rows=r,totals=true,percent=col"); err != nil || !p.Totals || p.Percent != "col" {
 		t.Errorf("totals: %+v %v", p, err)
 	}
-	if _, err := ParsePivot("rows=r,totals=maybe"); err == nil {
-		t.Error("bad totals must fail")
+	for _, bad := range []string{"rows=r,totals=maybe", "rows=r,percent=half"} {
+		if _, err := ParsePivot(bad); err == nil {
+			t.Errorf("ParsePivot(%q) must fail", bad)
+		}
+	}
+}
+
+func TestPivotPercent(t *testing.T) {
+	cases := []struct {
+		pct    string
+		totals bool
+		want   [][]string
+	}{
+		{"row", false, [][]string{
+			{"AP-SOUTH", "100", "NULL"},
+			{"EU-CENT", "NULL", "100"},
+			{"US-EAST", "100", "NULL"},
+		}},
+		{"col", true, [][]string{
+			{"AP-SOUTH", "18.02", "NULL", "17.19"},
+			{"EU-CENT", "NULL", "100", "4.62"},
+			{"US-EAST", "81.98", "NULL", "78.19"},
+			{"Total", "100", "100", "100"},
+		}},
+		{"total", true, [][]string{
+			{"AP-SOUTH", "17.19", "NULL", "17.19"},
+			{"EU-CENT", "NULL", "4.62", "4.62"},
+			{"US-EAST", "78.19", "NULL", "78.19"},
+			{"Total", "95.38", "4.62", "100"},
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.pct, func(t *testing.T) {
+			s := openFixture(t, "tiny.ndjson")
+			_, rows := pivotRows(t, s, NewSpec(s.Columns()), PivotSpec{Rows: []string{"region"}, On: "status",
+				Measures: []Measure{{Agg: "sum", Col: "amount"}}, Totals: c.totals, Percent: c.pct})
+			if !reflect.DeepEqual(rows, c.want) {
+				t.Errorf("rows = %v, want %v", rows, c.want)
+			}
+		})
+	}
+}
+
+func TestPivotPercentFixtures(t *testing.T) {
+	want := [][]string{
+		{"AP-SOUTH", "25", "2.87"},
+		{"EU-CENT", "25", "0.12"},
+		{"US-EAST", "25", "13.07"},
+		{"US-WEST", "25", "83.94"},
+	}
+	for _, file := range []string{"tiny.csv", "tiny.parquet"} {
+		t.Run(file, func(t *testing.T) {
+			s := openFixture(t, file)
+			q := NewSpec(s.Columns())
+			q.Filters = []FilterSpec{{Col: "status", Op: OpNe, Value: "FAILED", ColType: "VARCHAR"}}
+			_, rows := pivotRows(t, s, q, PivotSpec{Rows: []string{"region"}, Percent: "col",
+				Measures: []Measure{{Agg: "count"}, {Agg: "sum", Col: "amount"}}})
+			if !reflect.DeepEqual(rows, want) {
+				t.Errorf("rows = %v, want %v", rows, want)
+			}
+		})
+	}
+}
+
+func TestPivotPercentNeedsNumbers(t *testing.T) {
+	s := openFixture(t, "tiny.csv")
+	q := NewSpec(s.Columns())
+	q.Pivot = &PivotSpec{Rows: []string{"status"}, Percent: "row", Measures: []Measure{{Agg: "max", Col: "region"}}}
+	if _, err := s.ResolvePivot(context.Background(), q); err == nil {
+		t.Error("percent of a text value must fail")
+	}
+	q.Pivot.Percent = "half"
+	if _, err := q.SQL(); err == nil {
+		t.Error("unknown percent must fail")
 	}
 }
