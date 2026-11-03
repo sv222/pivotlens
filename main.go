@@ -19,7 +19,7 @@ var version = "dev"
 
 func main() {
 	showVersion := flag.BoolP("version", "v", false, "print version and exit")
-	pivot := flag.String("pivot", "", "print a pivot table as CSV, e.g. rows=region,cols=status,values=amount,agg=sum")
+	pivot := flag.String("pivot", "", "print a pivot table as CSV, e.g. rows=region,cols=status,values=amount:sum,*:count,totals=true")
 	out := flag.StringP("output", "o", "", "with --pivot, write to a .csv, .parquet or .ndjson file instead of stdout")
 	flag.Parse()
 	if *showVersion {
