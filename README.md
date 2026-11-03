@@ -151,7 +151,8 @@ US-WEST,,,9120
 DuckDB computes the pivot with one `GROUP BY` query, so it stays fast on
 millions of rows. A column field may have at most 50 distinct values;
 past that, pivotlens refuses and asks for a field with fewer values. Rows
-or columns whose field is empty show up as `NULL`.
+or columns whose field is NULL show up as `NULL` in the grid and as an empty field in CSV
+export. An empty string in the column field is labeled `(empty)`.
 
 ## How it works
 
