@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
 ### Added
 - Several value fields in one pivot: after picking a value, `add value` in the pivot builder adds another aggregate and value field, and `esc` on that step removes the last one. On the command line, `values=` takes a comma-separated list of `field:agg` items such as `values=amount:sum,amount:avg`; `*:count` counts rows. A bare field uses `agg=`, so `values=amount,agg=sum` still works.
 - Totals: `t` on a pivot view toggles a grand total row, labeled `Total` and always last, and, when there is a column field, a total column per value. Totals are real aggregates over all rows, computed by DuckDB, and are included in exports. On the command line, `totals=true`.
