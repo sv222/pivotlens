@@ -20,7 +20,7 @@ var version = "dev"
 func main() {
 	showVersion := flag.BoolP("version", "v", false, "print version and exit")
 	pivot := flag.String("pivot", "", "print a pivot table as CSV, e.g. rows=region,cols=status,values=amount,agg=sum")
-	out := flag.StringP("output", "o", "", "with --pivot, write to a .csv or .parquet file instead of stdout")
+	out := flag.StringP("output", "o", "", "with --pivot, write to a .csv, .parquet or .ndjson file instead of stdout")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("pivotlens", version)
@@ -66,8 +66,8 @@ func runPivot(path, spec, out string) error {
 		return err
 	}
 	format := strings.TrimPrefix(strings.ToLower(filepath.Ext(out)), ".")
-	if out != "" && format != "csv" && format != "parquet" {
-		return errors.New("--output must end in .csv or .parquet")
+	if out != "" && format != "csv" && format != "parquet" && format != "ndjson" {
+		return errors.New("--output must end in .csv, .parquet or .ndjson")
 	}
 	ctx := context.Background()
 	sess, err := engine.Open(ctx, path)

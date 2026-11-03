@@ -32,6 +32,8 @@ func exportFormat(path string) (string, bool) {
 		return "csv", true
 	case ".parquet":
 		return "parquet", true
+	case ".ndjson":
+		return "ndjson", true
 	}
 	return "", false
 }

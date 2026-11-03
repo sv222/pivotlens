@@ -213,6 +213,8 @@ func (q QuerySpec) ExportSQL(path, format string) (string, error) {
 		opts = "(FORMAT parquet)"
 	case "csv":
 		opts = "(FORMAT csv, HEADER)"
+	case "ndjson":
+		opts = "(FORMAT json)"
 	default:
 		return "", errors.New("unsupported export format " + format)
 	}

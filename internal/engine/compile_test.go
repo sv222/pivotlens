@@ -272,6 +272,14 @@ func TestExportSQL(t *testing.T) {
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
+	got, err = demoSpec().ExportSQL("out.ndjson", "ndjson")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = `COPY (` + demoPrefix + `SELECT * FROM filtered) TO 'out.ndjson' (FORMAT json)`
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
 	if _, err := demoSpec().ExportSQL("x.xlsx", "xlsx"); err == nil {
 		t.Error("unknown export format must fail")
 	}

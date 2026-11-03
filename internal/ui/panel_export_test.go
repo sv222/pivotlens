@@ -155,3 +155,11 @@ func (fakeErr) Error() string { return "fake export failure" }
 func writeFile(path, content string) error {
 	return osWriteFile(path, []byte(content))
 }
+
+func TestExportFormat(t *testing.T) {
+	for path, want := range map[string]string{"a.csv": "csv", "a.PARQUET": "parquet", "a.ndjson": "ndjson", "a.json": ""} {
+		if got, ok := exportFormat(path); got != want || ok != (want != "") {
+			t.Errorf("exportFormat(%q) = %q %v, want %q", path, got, ok, want)
+		}
+	}
+}
