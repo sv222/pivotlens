@@ -8,18 +8,23 @@ import (
 	"github.com/sv222/pivotlens/internal/engine"
 )
 
-const noField = "(none)"
+const (
+	noField  = "(none)"
+	addValue = "add value"
+	doneText = "done"
+)
 
-var pivotStages = []string{"rows", "columns", "aggregate", "values"}
+var pivotStages = []string{"rows", "columns", "aggregate", "values", "next"}
 
 type pivotPanel struct {
-	headers []string
-	numeric map[string]bool
-	spec    engine.QuerySpec
-	run     func(engine.QuerySpec) tea.Cmd
-	stage   int
-	idx     int
-	picks   [4]string
+	headers  []string
+	numeric  map[string]bool
+	spec     engine.QuerySpec
+	run      func(engine.QuerySpec) tea.Cmd
+	stage    int
+	idx      int
+	picks    [3]string
+	measures []engine.Measure
 }
 
 func newPivotPanel(headers []string, numeric map[string]bool, spec engine.QuerySpec, run func(engine.QuerySpec) tea.Cmd) *pivotPanel {
@@ -40,6 +45,8 @@ func (p *pivotPanel) options() []string {
 		return out
 	case 2:
 		return engine.PivotAggs
+	case 4:
+		return []string{doneText, addValue}
 	}
 	switch p.picks[2] {
 	case "count":
@@ -57,12 +64,9 @@ func (p *pivotPanel) options() []string {
 }
 
 func (p *pivotPanel) finish() PanelAction {
-	pv := engine.PivotSpec{Rows: []string{p.picks[0]}, Agg: p.picks[2]}
+	pv := engine.PivotSpec{Rows: []string{p.picks[0]}, Measures: p.measures}
 	if p.picks[1] != noField {
 		pv.On = p.picks[1]
-	}
-	if p.picks[3] != noField {
-		pv.AggCol = p.picks[3]
 	}
 	clone := p.spec.Clone()
 	clone.Sort = nil
@@ -78,10 +82,17 @@ func (p *pivotPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 	opts := p.options()
 	switch key.String() {
 	case "esc", "q":
-		if p.stage == 0 {
+		switch {
+		case p.stage == 0:
 			return p, PanelAction{Close: true}
+		case p.stage == 4:
+			p.measures = p.measures[:len(p.measures)-1]
+			p.stage = 3
+		case p.stage == 2 && len(p.measures) > 0:
+			p.stage = 4
+		default:
+			p.stage--
 		}
-		p.stage--
 		p.idx = 0
 	case "j", "down", "l", "right":
 		if p.idx < len(opts)-1 {
@@ -95,11 +106,22 @@ func (p *pivotPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 		if p.idx >= len(opts) {
 			return p, PanelAction{Close: true}
 		}
-		p.picks[p.stage] = opts[p.idx]
-		if p.stage == len(pivotStages)-1 {
+		switch {
+		case p.stage == 4 && opts[p.idx] == doneText:
 			return p, p.finish()
+		case p.stage == 4:
+			p.stage = 2
+		case p.stage == 3:
+			m := engine.Measure{Agg: p.picks[2]}
+			if opts[p.idx] != noField {
+				m.Col = opts[p.idx]
+			}
+			p.measures = append(p.measures, m)
+			p.stage = 4
+		default:
+			p.picks[p.stage] = opts[p.idx]
+			p.stage++
 		}
-		p.stage++
 		p.idx = 0
 	}
 	return p, PanelAction{}
@@ -108,6 +130,13 @@ func (p *pivotPanel) Update(msg tea.Msg) (Panel, PanelAction) {
 func (p *pivotPanel) View(s Styles, w int) string {
 	var b strings.Builder
 	b.WriteString("pivot " + pivotStages[p.stage] + ": ")
+	if len(p.measures) > 0 {
+		ls := make([]string, len(p.measures))
+		for i, m := range p.measures {
+			ls[i] = m.Label()
+		}
+		b.WriteString("[" + strings.Join(ls, ", ") + "] ")
+	}
 	opts := p.options()
 	if len(opts) == 0 {
 		b.WriteString(" no numeric fields ")

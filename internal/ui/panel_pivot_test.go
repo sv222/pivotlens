@@ -21,7 +21,7 @@ func TestPivotPanelBuildsSpec(t *testing.T) {
 		t.Fatalf("panel = %T, want *pivotPanel", m.panel)
 	}
 	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
-	for _, k := range []tea.Msg{enter, press("j"), enter, press("j"), enter, press("j"), press("j"), enter} {
+	for _, k := range []tea.Msg{enter, press("j"), enter, press("j"), enter, press("j"), press("j"), enter, enter} {
 		next, _ = m.Update(k)
 		m = next.(Model)
 	}
@@ -32,16 +32,41 @@ func TestPivotPanelBuildsSpec(t *testing.T) {
 		return func() tea.Msg { return q }
 	})
 	var a PanelAction
-	for _, k := range []tea.Msg{enter, press("j"), enter, press("j"), enter, press("j"), press("j"), enter} {
+	for _, k := range []tea.Msg{enter, press("j"), enter, press("j"), enter, press("j"), press("j"), enter, enter} {
 		_, a = p.Update(k)
 	}
 	q := a.Cmd().(engine.QuerySpec)
-	want := engine.PivotSpec{Rows: []string{"region"}, On: "status", Agg: "sum", AggCol: "amount"}
+	want := engine.PivotSpec{Rows: []string{"region"}, On: "status", Measures: []engine.Measure{{Agg: "sum", Col: "amount"}}}
 	if q.Pivot == nil || !reflect.DeepEqual(*q.Pivot, want) {
 		t.Fatalf("pivot = %+v, want %+v", q.Pivot, want)
 	}
 	if q.Sort != nil {
 		t.Error("source sort must not carry into the pivot")
+	}
+}
+
+func TestPivotPanelSeveralValues(t *testing.T) {
+	m := gridModel(t)
+	p := newPivotPanel(m.headers, m.sess.NumericFields(m.spec), m.spec.Clone(), func(q engine.QuerySpec) tea.Cmd {
+		return func() tea.Msg { return q }
+	})
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	esc := tea.KeyPressMsg{Code: tea.KeyEscape}
+	var a PanelAction
+	for _, k := range []tea.Msg{enter, enter, press("j"), enter, enter, press("j"), enter, enter, enter} {
+		_, a = p.Update(k)
+	}
+	if p.stage != 4 || !strings.Contains(p.View(m.styles, 80), "[sum(amount), count]") {
+		t.Fatalf("stage %d view %q", p.stage, p.View(m.styles, 80))
+	}
+	j := press("j")
+	for _, k := range []tea.Msg{esc, esc, esc, j, enter, j, j, j, j, enter, j, j, enter, enter} {
+		_, a = p.Update(k)
+	}
+	q := a.Cmd().(engine.QuerySpec)
+	want := []engine.Measure{{Agg: "sum", Col: "amount"}, {Agg: "max", Col: "amount"}}
+	if q.Pivot == nil || q.Pivot.On != "" || !reflect.DeepEqual(q.Pivot.Measures, want) {
+		t.Fatalf("pivot = %+v, want measures %v", q.Pivot, want)
 	}
 }
 
@@ -64,7 +89,7 @@ func TestPivotMsgOpensPivotView(t *testing.T) {
 	m := gridModel(t)
 	m.pivotReq = 2
 	q := m.spec.Clone()
-	q.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Agg: "count"}
+	q.Pivot = &engine.PivotSpec{Rows: []string{"region"}, On: "status", Measures: []engine.Measure{{Agg: "count"}}}
 	r, err := m.sess.ResolvePivot(context.Background(), q)
 	if err != nil {
 		t.Fatal(err)
