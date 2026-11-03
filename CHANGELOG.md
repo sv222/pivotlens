@@ -7,6 +7,13 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Several value fields in one pivot: after picking a value, `add value` in the pivot builder adds another aggregate and value field, and `esc` on that step removes the last one. On the command line, `values=` takes a comma-separated list of `field:agg` items such as `values=amount:sum,amount:avg`; `*:count` counts rows. A bare field uses `agg=`, so `values=amount,agg=sum` still works.
+- Totals: `t` on a pivot view toggles a grand total row, labeled `Total` and always last, and, when there is a column field, a total column per value. Totals are real aggregates over all rows, computed by DuckDB, and are included in exports. On the command line, `totals=true`.
+- Percent: `%` on a pivot view cycles values through percent of row, percent of column, percent of grand total, and back to plain values. On the command line, `percent=row|col|total`. Values are rounded to 2 decimals. Percent needs numeric values (count, or sum, avg, min or max of a numeric field); otherwise the pivot is refused with a message.
+- Export to NDJSON: `e` in the grid and `-o` with `--pivot` accept `.ndjson` besides `.csv` and `.parquet`, for normal views and pivots.
+- The pivot view's status bar lists its keys, `t` and `%` included.
+
 ## [0.2.0] - 2026-11-03
 
 ### Added
