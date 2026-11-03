@@ -187,8 +187,9 @@ func TestTotalsKeyTogglesTotals(t *testing.T) {
 	if !strings.Contains(m.renderStatus(), "with totals") {
 		t.Errorf("status = %q", m.renderStatus())
 	}
-	if m = runPivotKey(t, m, "t"); m.spec.Pivot.Totals {
-		t.Error("second t must turn totals off")
+	m.spec.Sort = []engine.SortKey{{Col: "Total", Desc: true}, {Col: "region"}}
+	if m = runPivotKey(t, m, "t"); m.spec.Pivot.Totals || !reflect.DeepEqual(m.spec.Sort, []engine.SortKey{{Col: "region"}}) {
+		t.Errorf("second t must turn totals off and drop the Total sort, got %+v", m.spec)
 	}
 }
 
