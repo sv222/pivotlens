@@ -537,3 +537,37 @@ func TestPivotPercentNeedsNumbers(t *testing.T) {
 		t.Error("unknown percent must fail")
 	}
 }
+
+func TestPivotPercentZeroTotalIsNull(t *testing.T) {
+	s := openNDJSON(t, `{"region":"A","status":"x","amount":5}
+{"region":"A","status":"y","amount":-5}
+{"region":"B","status":"x","amount":10}
+`)
+	_, rows := pivotRows(t, s, NewSpec(s.Columns()), PivotSpec{Rows: []string{"region"}, On: "status",
+		Measures: []Measure{{Agg: "sum", Col: "amount"}}, Percent: "row"})
+	want := [][]string{{"A", "NULL", "NULL"}, {"B", "100", "NULL"}}
+	if !reflect.DeepEqual(rows, want) {
+		t.Errorf("rows = %v, want %v", rows, want)
+	}
+}
+
+func TestPivotPercentSeveralValuesWithColumnField(t *testing.T) {
+	s := openNDJSON(t, `{"region":"A","status":"x","amount":10}
+{"region":"A","status":"y","amount":30}
+{"region":"B","status":"x","amount":30}
+{"region":"B","status":"x","amount":30}
+`)
+	cols, rows := pivotRows(t, s, NewSpec(s.Columns()), PivotSpec{Rows: []string{"region"}, On: "status",
+		Measures: []Measure{{Agg: "sum", Col: "amount"}, {Agg: "count"}}, Percent: "col"})
+	wantCols := []string{"region", "x sum(amount)", "x count", "y sum(amount)", "y count"}
+	if !reflect.DeepEqual(cols, wantCols) {
+		t.Fatalf("cols = %v, want %v", cols, wantCols)
+	}
+	want := [][]string{
+		{"A", "14.29", "33.33", "100", "100"},
+		{"B", "85.71", "66.67", "NULL", "0"},
+	}
+	if !reflect.DeepEqual(rows, want) {
+		t.Errorf("rows = %v, want %v", rows, want)
+	}
+}
