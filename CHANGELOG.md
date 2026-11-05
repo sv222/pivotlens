@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Several files or a glob open as one table; the columns and types must match, or pivotlens names the first file that differs. `--source-column[=name]` adds a column with each row's file name.
+- Stdin: pass `-` or pipe into pivotlens. CSV, Parquet and NDJSON are detected from the first bytes.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
