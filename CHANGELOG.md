@@ -7,6 +7,9 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Saved views: `w` in the grid saves the current view (columns, filters, sort, pivot) to a versioned JSON file, and `o` opens one. On the command line, `--view file` starts with a saved view and `--save-view file` saves the view of a `--pivot` run.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
