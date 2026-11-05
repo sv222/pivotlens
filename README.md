@@ -127,6 +127,8 @@ $ curl -s https://example.com/data.csv | pivotlens --pivot rows=region,values=am
 | `-v`, `--version` | print the version and exit |
 | `--pivot spec` | print a pivot table as CSV and exit, see [Pivot tables](#pivot-tables) |
 | `-o`, `--output file` | with `--pivot`, write to a `.csv`, `.parquet` or `.ndjson` file instead of stdout |
+| `--view file` | open with the view saved in a JSON file, see [Saved views](#saved-views) |
+| `--save-view file` | with `--pivot`, save the view to a JSON file |
 | `--source-column[=name]` | add a column with each row's file name, `source` unless named, see [Several files and stdin](#several-files-and-stdin) |
 
 | Key | Effect |
@@ -146,6 +148,8 @@ $ curl -s https://example.com/data.csv | pivotlens --pivot rows=region,values=am
 | `p` | build a pivot table: pick rows, columns, aggregates and values with `j`/`k` and `enter`, `add value` adds another value, `esc` steps back |
 | `t` | on a pivot view, toggle the grand total row and total columns |
 | `%` | on a pivot view, cycle values as percent of row, of column, of grand total, then plain |
+| `w` | save the current view to a JSON file |
+| `o` | open a saved view; `u` goes back |
 | `q`, `ctrl+c` | quit |
 
 ## Pivot tables
@@ -211,6 +215,24 @@ or columns whose field is NULL show up as `NULL` in the grid and as an empty fie
 export. An empty string in the column field is labeled `(empty)`.
 With totals on, the first row field is exported as text, so the `Total`
 label fits in the same column.
+
+## Saved views
+
+A view is one `QuerySpec`: hidden, renamed and cast columns, filters, sort
+and pivot. Press `w` to save the current view to a JSON file, and `o` to
+open one; `u` undoes an open. From the command line, `--view view.json`
+starts with a saved view, and with `--pivot` the pivot is applied on top of
+it. `--save-view view.json` saves the view that `--pivot` printed.
+
+```
+$ pivotlens --pivot rows=region,cols=status,values=amount:sum --save-view by-region.json data.csv
+$ pivotlens --view by-region.json data.csv
+```
+
+The file is JSON with a `version` field, currently `1`; pivotlens refuses a
+newer version and unknown fields. Pivot column values are not saved, they are
+read from the data when the view is opened. A view needs a source with the
+same columns, and is refused with a message when it does not fit.
 
 ## How it works
 

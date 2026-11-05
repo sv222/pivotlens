@@ -149,6 +149,16 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return exportCmd(context.Background(), m.sess, q, path, format, id)
 		})
 		return m, nil
+	case "w", "o":
+		m.viewReq++
+		id := m.viewReq
+		if msg.String() == "w" {
+			spec := m.spec.Clone()
+			m.panel = newViewPanel(true, func(path string) tea.Cmd { return saveViewCmd(spec, path, id) })
+		} else {
+			m.panel = newViewPanel(false, func(path string) tea.Cmd { return loadViewCmd(m.ctx, m.sess, path, id) })
+		}
+		return m, nil
 	case "i":
 		if m.spec.Pivot != nil {
 			m.errText = "stats are unavailable on a pivot view"

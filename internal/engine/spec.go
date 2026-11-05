@@ -1,6 +1,9 @@
 package engine
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type ColumnMeta struct {
 	Name string
@@ -8,12 +11,12 @@ type ColumnMeta struct {
 }
 
 type ColSpec struct {
-	Name   string
-	Alias  string
-	Cast   string
-	Hidden bool
-	Trim   bool
-	NullAs string
+	Name   string `json:"name"`
+	Alias  string `json:"alias,omitempty"`
+	Cast   string `json:"cast,omitempty"`
+	Hidden bool   `json:"hidden,omitempty"`
+	Trim   bool   `json:"trim,omitempty"`
+	NullAs string `json:"null_as,omitempty"`
 }
 
 func (c ColSpec) Display() string {
@@ -24,32 +27,32 @@ func (c ColSpec) Display() string {
 }
 
 type SortKey struct {
-	Col  string
-	Desc bool
+	Col  string `json:"col"`
+	Desc bool   `json:"desc,omitempty"`
 }
 
 type Measure struct {
-	Agg string
-	Col string
+	Agg string `json:"agg"`
+	Col string `json:"col,omitempty"`
 }
 
 type PivotSpec struct {
-	Rows     []string
-	On       string
-	Measures []Measure
-	Totals   bool
-	Percent  string
-	Keys     []string
-	Null     bool
+	Rows     []string  `json:"rows"`
+	On       string    `json:"on,omitempty"`
+	Measures []Measure `json:"measures"`
+	Totals   bool      `json:"totals,omitempty"`
+	Percent  string    `json:"percent,omitempty"`
+	Keys     []string  `json:"keys,omitempty"`
+	Null     bool      `json:"null,omitempty"`
 }
 
 type QuerySpec struct {
-	Cols     []ColSpec
-	Filter   string
-	Filters  []FilterSpec
-	DropNull []string
-	Sort     []SortKey
-	Pivot    *PivotSpec
+	Cols     []ColSpec    `json:"cols"`
+	Filter   string       `json:"filter,omitempty"`
+	Filters  []FilterSpec `json:"filters,omitempty"`
+	DropNull []string     `json:"drop_null,omitempty"`
+	Sort     []SortKey    `json:"sort,omitempty"`
+	Pivot    *PivotSpec   `json:"pivot,omitempty"`
 }
 
 func NewSpec(cols []ColumnMeta) QuerySpec {
@@ -132,10 +135,10 @@ func (o Op) String() string {
 }
 
 type FilterSpec struct {
-	Col     string
-	Op      Op
-	Value   string
-	ColType string
+	Col     string `json:"col"`
+	Op      Op     `json:"op"`
+	Value   string `json:"value,omitempty"`
+	ColType string `json:"col_type,omitempty"`
 }
 
 func (f FilterSpec) String() string {
@@ -143,6 +146,23 @@ func (f FilterSpec) String() string {
 		return f.Col + " " + f.Op.String()
 	}
 	return f.Col + " " + f.Op.String() + " " + f.Value
+}
+
+func (o Op) MarshalText() ([]byte, error) {
+	if o < OpEq || o > OpNotNull {
+		return nil, fmt.Errorf("unknown filter operator %d", int(o))
+	}
+	return []byte(o.String()), nil
+}
+
+func (o *Op) UnmarshalText(b []byte) error {
+	for c := OpEq; c <= OpNotNull; c++ {
+		if c.String() == string(b) {
+			*o = c
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown filter operator %q", b)
 }
 
 func OpsFor(t string) []Op {
