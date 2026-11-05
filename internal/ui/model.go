@@ -66,6 +66,13 @@ func New(s *engine.Session) Model {
 	return m
 }
 
+func (m Model) WithSpec(q engine.QuerySpec) Model {
+	m.spec = q
+	m.headers = displayNames(q)
+	m.widths = Fit(nil, m.headers)
+	return m
+}
+
 func displayNames(q engine.QuerySpec) []string {
 	if q.Pivot != nil {
 		return q.Pivot.Columns()

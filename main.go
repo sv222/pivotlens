@@ -21,6 +21,8 @@ func main() {
 	showVersion := flag.BoolP("version", "v", false, "print version and exit")
 	pivot := flag.String("pivot", "", "print a pivot table as CSV, e.g. rows=region,cols=status,values=amount:sum,*:count,totals=true")
 	out := flag.StringP("output", "o", "", "with --pivot, write to a .csv, .parquet or .ndjson file instead of stdout")
+	view := flag.String("view", "", "open with the view saved in this JSON file")
+	saveView := flag.String("save-view", "", "with --pivot, save the view to this JSON file")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("pivotlens", version)
@@ -33,11 +35,13 @@ func main() {
 	var err error
 	switch {
 	case *pivot != "":
-		err = runPivot(flag.Arg(0), *pivot, *out)
+		err = runPivot(flag.Arg(0), *pivot, *out, *view, *saveView)
 	case *out != "":
 		err = errors.New("--output needs --pivot")
+	case *saveView != "":
+		err = errors.New("--save-view needs --pivot")
 	default:
-		err = run(flag.Arg(0))
+		err = run(flag.Arg(0), *view)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "pivotlens:", err)
@@ -45,7 +49,7 @@ func main() {
 	}
 }
 
-func run(path string) (err error) {
+func run(path, view string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("internal error: %v", r)
@@ -56,11 +60,19 @@ func run(path string) (err error) {
 		return err
 	}
 	defer func() { _ = sess.Close() }()
-	_, err = tea.NewProgram(ui.New(sess)).Run()
+	m := ui.New(sess)
+	if view != "" {
+		q, err := sess.LoadView(context.Background(), view)
+		if err != nil {
+			return err
+		}
+		m = m.WithSpec(q)
+	}
+	_, err = tea.NewProgram(m).Run()
 	return err
 }
 
-func runPivot(path, spec, out string) error {
+func runPivot(path, spec, out, view, saveView string) error {
 	p, err := engine.ParsePivot(spec)
 	if err != nil {
 		return err
@@ -76,9 +88,19 @@ func runPivot(path, spec, out string) error {
 	}
 	defer func() { _ = sess.Close() }()
 	q := engine.NewSpec(sess.Columns())
+	if view != "" {
+		if q, err = sess.LoadView(ctx, view); err != nil {
+			return err
+		}
+	}
 	q.Pivot = &p
 	if q, err = sess.ResolvePivot(ctx, q); err != nil {
 		return err
+	}
+	if saveView != "" {
+		if err := engine.SaveView(saveView, q); err != nil {
+			return err
+		}
 	}
 	if out == "" {
 		return sess.WriteCSV(ctx, q, os.Stdout)
