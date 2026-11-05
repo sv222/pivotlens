@@ -8,6 +8,8 @@ and this project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Several files or a glob open as one table; the columns and types must match, or pivotlens names the first file that differs. `--source-column[=name]` adds a column with each row's file name.
+- Stdin: pass `-` or pipe into pivotlens. CSV, Parquet and NDJSON are detected from the first bytes.
 - Saved views: `w` in the grid saves the current view (columns, filters, sort, pivot) to a versioned JSON file, and `o` opens one. On the command line, `--view file` starts with a saved view and `--save-view file` saves the view of a `--pivot` run.
 
 ## [0.3.0] - 2026-11-03

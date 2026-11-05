@@ -93,7 +93,31 @@ $ pivotlens --version
 pivotlens dev
 
 $ pivotlens
-usage: pivotlens <file.csv|file.parquet|file.ndjson>
+usage: pivotlens [--pivot spec [-o out.csv]] [--source-column[=name]] <file|glob|->...
+```
+
+## Several files and stdin
+
+Give pivotlens several files, or a glob, and it shows them as one table:
+
+```
+$ pivotlens 2026-*.csv
+$ pivotlens jan.csv feb.parquet
+```
+
+All files must have the same columns, names and types; otherwise pivotlens
+stops and names the first file that differs. `--source-column` adds a column
+with each row's file name, called `source`; `--source-column=file` picks
+another name. Quote a glob to let pivotlens expand it instead of the shell,
+which also works where the shell does not expand globs.
+
+Pass `-` to read stdin, or just pipe into pivotlens. The format is detected
+from the first bytes: Parquet, NDJSON/JSON, otherwise CSV. Stdin is copied to
+a temporary file, removed on exit, so large pipes need that much disk.
+
+```
+$ zcat logs.csv.gz | pivotlens
+$ curl -s https://example.com/data.csv | pivotlens --pivot rows=region,values=amount,agg=sum -
 ```
 
 ## Usage and flags
@@ -105,6 +129,7 @@ usage: pivotlens <file.csv|file.parquet|file.ndjson>
 | `-o`, `--output file` | with `--pivot`, write to a `.csv`, `.parquet` or `.ndjson` file instead of stdout |
 | `--view file` | open with the view saved in a JSON file, see [Saved views](#saved-views) |
 | `--save-view file` | with `--pivot`, save the view to a JSON file |
+| `--source-column[=name]` | add a column with each row's file name, `source` unless named, see [Several files and stdin](#several-files-and-stdin) |
 
 | Key | Effect |
 |---|---|

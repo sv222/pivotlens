@@ -108,3 +108,28 @@ func TestSaveViewKeepsCallerSpec(t *testing.T) {
 		t.Error("SaveView must not modify its argument")
 	}
 }
+
+func TestViewWithSourceColumnAndStdin(t *testing.T) {
+	dir := t.TempDir()
+	a := writeFile(t, dir, "a.csv", "k,v\nx,1\ny,2\n")
+	s := openInput(t, Input{Paths: []string{a, a}, Source: "file"})
+	q := NewSpec(s.Columns())
+	q.Cols[0].Hidden = true
+	q.Sort = []SortKey{{Col: "file", Desc: true}}
+	path := filepath.Join(dir, "v.json")
+	if err := SaveView(path, q); err != nil {
+		t.Fatal(err)
+	}
+	piped := openInput(t, Input{Paths: []string{StdinPath, a}, Stdin: strings.NewReader("k,v\nz,3\n"), Source: "file"})
+	got, err := piped.LoadView(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, q) {
+		t.Errorf("view changed:\n got %+v\nwant %+v", got, q)
+	}
+	plain := openInput(t, Input{Paths: []string{a}})
+	if _, err := plain.LoadView(context.Background(), path); err == nil || !strings.Contains(err.Error(), `unknown column "file"`) {
+		t.Errorf("err = %v, want unknown column", err)
+	}
+}
