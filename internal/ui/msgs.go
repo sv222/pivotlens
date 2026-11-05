@@ -40,6 +40,31 @@ type exportMsg struct {
 	err  error
 }
 
+type viewSavedMsg struct {
+	id   reqID
+	path string
+	err  error
+}
+
+type viewLoadedMsg struct {
+	id   reqID
+	spec engine.QuerySpec
+	err  error
+}
+
+func saveViewCmd(q engine.QuerySpec, path string, id reqID) tea.Cmd {
+	return func() tea.Msg {
+		return viewSavedMsg{id: id, path: path, err: engine.SaveView(path, q)}
+	}
+}
+
+func loadViewCmd(ctx context.Context, s *engine.Session, path string, id reqID) tea.Cmd {
+	return func() tea.Msg {
+		q, err := s.LoadView(ctx, path)
+		return viewLoadedMsg{id: id, spec: q, err: err}
+	}
+}
+
 type pivotMsg struct {
 	id   reqID
 	spec engine.QuerySpec

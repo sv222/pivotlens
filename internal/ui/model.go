@@ -40,6 +40,7 @@ type Model struct {
 	exportReq reqID
 	statsReq  reqID
 	pivotReq  reqID
+	viewReq   reqID
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -196,6 +197,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errText = ""
 		m.notice = "wrote " + msg.path
 		return m, nil
+
+	case viewSavedMsg:
+		if msg.id != m.viewReq {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.errText = msg.err.Error()
+			return m, nil
+		}
+		m.panel = nil
+		m.errText = ""
+		m.notice = "saved view " + msg.path
+		return m, nil
+
+	case viewLoadedMsg:
+		if msg.id != m.viewReq {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.errText = msg.err.Error()
+			return m, nil
+		}
+		m.panel = nil
+		m.errText = ""
+		m = m.push()
+		m.spec = msg.spec
+		m.colCursor = 0
+		return m.reload()
 
 	case pivotMsg:
 		if msg.id != m.pivotReq {
