@@ -50,7 +50,7 @@ func (p *statsPanel) View(s Styles, w int) string {
 	fmt.Fprintf(&b, "%s: rows %d  nulls %d  distinct %d  min %s  max %s",
 		p.col, p.stats.Rows, p.stats.Nulls, p.stats.Distinct, p.stats.Min, p.stats.Max)
 	if p.stats.Numeric {
-		fmt.Fprintf(&b, "  avg %s  sum %s", p.stats.Avg, p.stats.Sum)
+		fmt.Fprintf(&b, "  median %s  avg %s  sum %s", p.stats.Median, p.stats.Avg, p.stats.Sum)
 	}
 	b.WriteString("   [esc] close")
 	return b.String()

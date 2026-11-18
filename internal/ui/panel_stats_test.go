@@ -92,11 +92,11 @@ func TestStatsPanelRendersResult(t *testing.T) {
 func TestStatsPanelRendersNumeric(t *testing.T) {
 	m := gridModel(t)
 	p := newStatsPanel("amount")
-	p.stats = engine.ColumnStats{Rows: 5, Avg: "2189.85", Sum: "10949.25", Numeric: true}
+	p.stats = engine.ColumnStats{Rows: 5, Median: "312.25", Avg: "2189.85", Sum: "10949.25", Numeric: true}
 	p.done = true
 	m.panel = p
 	v := m.View().Content
-	if !strings.Contains(v, "avg 2189.85") || !strings.Contains(v, "sum 10949.25") {
+	if !strings.Contains(v, "median 312.25") || !strings.Contains(v, "avg 2189.85") || !strings.Contains(v, "sum 10949.25") {
 		t.Errorf("numeric fields missing: %q", v)
 	}
 }

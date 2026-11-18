@@ -28,8 +28,8 @@ func TestStatsSQLNumeric(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(got, `CAST(avg("amount") AS VARCHAR), CAST(sum("amount") AS VARCHAR)`) {
-		t.Errorf("numeric stats missing avg/sum: %s", got)
+	if !contains(got, `CAST(median("amount") AS VARCHAR), CAST(avg("amount") AS VARCHAR), CAST(sum("amount") AS VARCHAR)`) {
+		t.Errorf("numeric stats missing median/avg/sum: %s", got)
 	}
 }
 
@@ -103,5 +103,8 @@ func TestStatsLive(t *testing.T) {
 	}
 	if am.Nulls != 0 {
 		t.Errorf("nulls = %d, want 0", am.Nulls)
+	}
+	if am.Median != "312.25" {
+		t.Errorf("median = %q, want 312.25", am.Median)
 	}
 }

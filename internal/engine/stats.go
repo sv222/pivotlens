@@ -15,6 +15,7 @@ type ColumnStats struct {
 	Distinct int64
 	Min      string
 	Max      string
+	Median   string
 	Avg      string
 	Sum      string
 	Numeric  bool
@@ -51,7 +52,7 @@ func (q QuerySpec) StatsSQL(col string, numeric bool) (string, error) {
 	sel := "count(*), count(*) - count(" + c + "), count(DISTINCT " + c + "), " +
 		"CAST(min(" + c + ") AS VARCHAR), CAST(max(" + c + ") AS VARCHAR)"
 	if numeric {
-		sel += ", CAST(avg(" + c + ") AS VARCHAR), CAST(sum(" + c + ") AS VARCHAR)"
+		sel += ", CAST(median(" + c + ") AS VARCHAR), CAST(avg(" + c + ") AS VARCHAR), CAST(sum(" + c + ") AS VARCHAR)"
 	}
 	return pre + "SELECT " + sel + " FROM filtered", nil
 }
@@ -73,7 +74,7 @@ func (s *Session) Stats(ctx context.Context, q QuerySpec, col string) (ColumnSta
 	}
 	n := 5
 	if numeric {
-		n = 7
+		n = 8
 	}
 	raw := make([]sql.NullString, n)
 	ptrs := make([]any, n)
@@ -101,7 +102,7 @@ func (s *Session) Stats(ctx context.Context, q QuerySpec, col string) (ColumnSta
 	}
 	st.Min, st.Max = val(3), val(4)
 	if numeric {
-		st.Avg, st.Sum = val(5), val(6)
+		st.Median, st.Avg, st.Sum = val(5), val(6), val(7)
 	}
 	return st, nil
 }
