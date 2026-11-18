@@ -93,7 +93,7 @@ $ pivotlens --version
 pivotlens dev
 
 $ pivotlens
-usage: pivotlens [--pivot spec [-o out.csv]] [--source-column[=name]] <file|glob|->...
+usage: pivotlens [--pivot spec [-o out.csv]] [--head N] [--schema] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...
 ```
 
 ## Several files and stdin
@@ -120,6 +120,27 @@ $ zcat logs.csv.gz | pivotlens
 $ curl -s https://example.com/data.csv | pivotlens --pivot rows=region,values=amount,agg=sum -
 ```
 
+## Head and schema
+
+For scripts that need a sample or the shape of a file, `--head N` prints
+the first `N` rows of the file as CSV without opening the grid, and
+`--schema` prints the column names and types. Both accept the same files,
+globs and stdin as the grid, and `--head` also accepts `--view`.
+
+```
+$ pivotlens --head 2 testdata/tiny.csv
+region,status,amount,created_at
+US-EAST,COMPLETED,1420.5,2026-09-01 14:02:11
+EU-CENT,FAILED,84,2026-09-01 14:02:15
+
+$ pivotlens --schema testdata/tiny.csv
+name,type
+region,VARCHAR
+status,VARCHAR
+amount,DOUBLE
+created_at,TIMESTAMP
+```
+
 ## Usage and flags
 
 | Flag | Effect |
@@ -129,6 +150,8 @@ $ curl -s https://example.com/data.csv | pivotlens --pivot rows=region,values=am
 | `-o`, `--output file` | with `--pivot`, write to a `.csv`, `.parquet` or `.ndjson` file instead of stdout |
 | `--view file` | open with the view saved in a JSON file, see [Saved views](#saved-views) |
 | `--save-view file` | with `--pivot`, save the view to a JSON file |
+| `--head N` | print the first `N` rows as CSV and exit, see [Head and schema](#head-and-schema) |
+| `--schema` | print the column names and types as CSV and exit, see [Head and schema](#head-and-schema) |
 | `--source-column[=name]` | add a column with each row's file name, `source` unless named, see [Several files and stdin](#several-files-and-stdin) |
 
 | Key | Effect |
@@ -144,7 +167,7 @@ $ curl -s https://example.com/data.csv | pivotlens --pivot rows=region,values=am
 | `u` | undo the last applied sort or filter |
 | `c` | manage columns: `space` hides, `J`/`K` reorder, `r` renames, `enter` applies, `esc` discards |
 | `e` | export the current view to a `.csv`, `.parquet` or `.ndjson` file |
-| `i` | show statistics for the current column over the filtered view |
+| `i` | show statistics for the current column over the filtered view: rows, nulls, distinct, min, max, and median, avg, sum for numeric columns |
 | `p` | build a pivot table: pick rows, columns, aggregates and values with `j`/`k` and `enter`, `add value` adds another value, `esc` steps back |
 | `t` | on a pivot view, toggle the grand total row and total columns |
 | `%` | on a pivot view, cycle values as percent of row, of column, of grand total, then plain |
