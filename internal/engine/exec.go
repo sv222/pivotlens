@@ -172,3 +172,18 @@ func (s *Session) WriteHead(ctx context.Context, q QuerySpec, n int, w io.Writer
 	cw.Flush()
 	return cw.Error()
 }
+
+// WriteSchema writes the column names and types of this source as CSV.
+func (s *Session) WriteSchema(w io.Writer) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"name", "type"}); err != nil {
+		return err
+	}
+	for _, c := range s.cols {
+		if err := cw.Write([]string{c.Name, c.Type}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}

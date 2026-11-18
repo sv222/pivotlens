@@ -25,6 +25,7 @@ func main() {
 	saveView := flag.String("save-view", "", "with --pivot, save the view to this JSON file")
 	source := flag.String("source-column", "", "add a column with each row's file name, named `name` (default \"source\")")
 	head := flag.Int("head", 0, "print the first `N` rows as CSV and exit")
+	schema := flag.Bool("schema", false, "print the column names and types as CSV and exit")
 	flag.Lookup("source-column").NoOptDefVal = "source"
 	flag.Parse()
 	if *showVersion {
@@ -36,12 +37,14 @@ func main() {
 		paths = []string{engine.StdinPath}
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: pivotlens [--pivot spec [-o out.csv]] [--head N] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...")
+		fmt.Fprintln(os.Stderr, "usage: pivotlens [--pivot spec [-o out.csv]] [--head N] [--schema] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...")
 		os.Exit(2)
 	}
 	in := engine.Input{Paths: paths, Stdin: os.Stdin, Source: *source}
 	var err error
 	switch {
+	case *schema:
+		err = runSchema(in)
 	case *head > 0:
 		err = runHead(in, *head, *view)
 	case *pivot != "":
@@ -57,6 +60,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "pivotlens:", err)
 		os.Exit(1)
 	}
+}
+
+func runSchema(in engine.Input) error {
+	sess, err := engine.OpenInput(context.Background(), in)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = sess.Close() }()
+	return sess.WriteSchema(os.Stdout)
 }
 
 func runHead(in engine.Input, n int, view string) error {
