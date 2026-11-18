@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -174,5 +175,58 @@ func TestExport(t *testing.T) {
 	}
 	if fi.Size() == 0 {
 		t.Error("exported file is empty")
+	}
+}
+
+func TestWriteHeadWritesHeaderAndFirstRows(t *testing.T) {
+	s := openFixture(t, "tiny.csv")
+	q := NewSpec(s.Columns())
+	var b strings.Builder
+	if err := s.WriteHead(context.Background(), q, 2, &b); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("got %d lines, want header plus 2 rows: %q", len(lines), b.String())
+	}
+	if lines[0] != "region,status,amount,created_at" {
+		t.Errorf("header = %q", lines[0])
+	}
+	if lines[1] != "US-EAST,COMPLETED,1420.5,2026-09-01 14:02:11" {
+		t.Errorf("row 1 = %q", lines[1])
+	}
+}
+
+func TestWriteHeadStopsAtLastRow(t *testing.T) {
+	s := openFixture(t, "tiny.csv")
+	q := NewSpec(s.Columns())
+	var b strings.Builder
+	if err := s.WriteHead(context.Background(), q, 100, &b); err != nil {
+		t.Fatal(err)
+	}
+	n := strings.Count(b.String(), "\n")
+	if n != 6 {
+		t.Errorf("got %d lines, want header plus 5 rows", n)
+	}
+}
+
+func TestWriteSchemaWritesNamesAndTypes(t *testing.T) {
+	s := openFixture(t, "tiny.csv")
+	var b strings.Builder
+	if err := s.WriteSchema(&b); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n")
+	if len(lines) != 5 {
+		t.Fatalf("got %d lines, want 5: %q", len(lines), b.String())
+	}
+	if lines[0] != "name,type" {
+		t.Errorf("header = %q, want name,type", lines[0])
+	}
+	if lines[1] != "region,VARCHAR" {
+		t.Errorf("row 1 = %q, want region,VARCHAR", lines[1])
+	}
+	if lines[3] != "amount,DOUBLE" {
+		t.Errorf("row 3 = %q, want amount,DOUBLE", lines[3])
 	}
 }

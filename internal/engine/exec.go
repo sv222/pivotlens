@@ -153,3 +153,22 @@ func (s *Session) WriteCSV(ctx context.Context, q QuerySpec, w io.Writer) error 
 	cw.Flush()
 	return cw.Error()
 }
+
+// WriteHead writes the first n rows of q as CSV, header included.
+func (s *Session) WriteHead(ctx context.Context, q QuerySpec, n int, w io.Writer) error {
+	rows, cols, err := s.FetchPage(ctx, q, n, 0)
+	if err != nil {
+		return err
+	}
+	cw := csv.NewWriter(w)
+	if err := cw.Write(cols); err != nil {
+		return err
+	}
+	for _, rec := range rows {
+		if err := cw.Write(rec); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
