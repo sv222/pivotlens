@@ -41,7 +41,7 @@ func (s *Session) NumericFields(q QuerySpec) map[string]bool {
 }
 
 func (q QuerySpec) StatsSQL(col string, numeric bool) (string, error) {
-	if q.Pivot != nil {
+	if q.Pivot != nil || q.Freq != nil {
 		return "", ErrPivotStats
 	}
 	pre, err := q.prefix()

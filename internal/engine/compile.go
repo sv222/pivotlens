@@ -148,10 +148,13 @@ func (q QuerySpec) orderBy() string {
 }
 
 func (q QuerySpec) body() (string, error) {
-	if q.Pivot == nil {
-		return "SELECT * FROM filtered" + q.orderBy(), nil
+	switch {
+	case q.Pivot != nil:
+		return q.pivotBody()
+	case q.Freq != nil:
+		return q.freqBody(freqProjection)
 	}
-	return q.pivotBody()
+	return "SELECT * FROM filtered" + q.orderBy(), nil
 }
 
 func (q QuerySpec) SQL() (string, error) {
@@ -179,6 +182,13 @@ func (q QuerySpec) CountSQL() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if q.Freq != nil {
+		b, err := q.freqBody("count(*)")
+		if err != nil {
+			return "", err
+		}
+		return pre + b, nil
+	}
 	if q.Pivot == nil {
 		return pre + "SELECT count(*) FROM filtered", nil
 	}
@@ -190,7 +200,7 @@ func (q QuerySpec) CountSQL() (string, error) {
 }
 
 func (q QuerySpec) WidthsSQL(sample int) (string, error) {
-	if q.Pivot != nil {
+	if q.Pivot != nil || q.Freq != nil {
 		return "", ErrPivotWidths
 	}
 	pre, err := q.prefix()

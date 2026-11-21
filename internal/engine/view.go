@@ -17,12 +17,14 @@ type viewFile struct {
 }
 
 // SaveView writes q as versioned JSON. Pivot keys are left out: they come
-// from the data and are resolved again on load.
+// from the data and are resolved again on load. A value counts view is
+// transient and never saved; its drill-down filters stay.
 func SaveView(path string, q QuerySpec) error {
 	q = q.Clone()
 	if q.Pivot != nil {
 		q.Pivot.Keys, q.Pivot.Null = nil, false
 	}
+	q.Freq = nil
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)

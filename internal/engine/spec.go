@@ -53,6 +53,7 @@ type QuerySpec struct {
 	DropNull []string     `json:"drop_null,omitempty"`
 	Sort     []SortKey    `json:"sort,omitempty"`
 	Pivot    *PivotSpec   `json:"pivot,omitempty"`
+	Freq     *FreqSpec    `json:"freq,omitempty"`
 }
 
 func NewSpec(cols []ColumnMeta) QuerySpec {
@@ -85,6 +86,10 @@ func (q QuerySpec) Clone() QuerySpec {
 		p.Measures = append([]Measure(nil), q.Pivot.Measures...)
 		p.Keys = append([]string(nil), q.Pivot.Keys...)
 		n.Pivot = &p
+	}
+	if q.Freq != nil {
+		f := *q.Freq
+		n.Freq = &f
 	}
 	return n
 }
