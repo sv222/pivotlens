@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +21,9 @@ var version = "dev"
 func main() {
 	showVersion := flag.BoolP("version", "v", false, "print version and exit")
 	pivot := flag.String("pivot", "", "print a pivot table as CSV, e.g. rows=region,cols=status,values=amount:sum,*:count,totals=true")
-	out := flag.StringP("output", "o", "", "with --pivot, write to a .csv, .parquet or .ndjson file instead of stdout")
+	freq := flag.String("freq", "", "print value counts of a `column` as CSV and exit")
+	top := flag.Int("top", engine.DefaultTop, "with --freq, print the top `N` values, 0 for all")
+	out := flag.StringP("output", "o", "", "with --pivot or --freq, write to a .csv, .parquet or .ndjson file instead of stdout")
 	view := flag.String("view", "", "open with the view saved in this JSON file")
 	saveView := flag.String("save-view", "", "with --pivot, save the view to this JSON file")
 	source := flag.String("source-column", "", "add a column with each row's file name, named `name` (default \"source\")")
@@ -28,6 +31,12 @@ func main() {
 	schema := flag.Bool("schema", false, "print the column names and types as CSV and exit")
 	flag.Lookup("source-column").NoOptDefVal = "source"
 	flag.Parse()
+	topSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "top" {
+			topSet = true
+		}
+	})
 	if *showVersion {
 		fmt.Println("pivotlens", version)
 		return
@@ -37,7 +46,7 @@ func main() {
 		paths = []string{engine.StdinPath}
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: pivotlens [--pivot spec [-o out.csv]] [--head N] [--schema] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...")
+		fmt.Fprintln(os.Stderr, "usage: pivotlens [--pivot spec [-o out.csv]] [--freq column [--top N]] [--head N] [--schema] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...")
 		os.Exit(2)
 	}
 	in := engine.Input{Paths: paths, Stdin: os.Stdin, Source: *source}
@@ -47,12 +56,16 @@ func main() {
 		err = runSchema(in)
 	case *head > 0:
 		err = runHead(in, *head, *view)
+	case *freq != "":
+		err = runFreq(in, *freq, *top, *out, *view, *saveView, os.Stdout)
 	case *pivot != "":
 		err = runPivot(in, *pivot, *out, *view, *saveView)
 	case *out != "":
-		err = errors.New("--output needs --pivot")
+		err = errors.New("--output needs --pivot or --freq")
 	case *saveView != "":
 		err = errors.New("--save-view needs --pivot")
+	case topSet:
+		err = errors.New("--top needs --freq")
 	default:
 		err = run(in, *view)
 	}
@@ -142,6 +155,40 @@ func runPivot(in engine.Input, spec, out, view, saveView string) error {
 	}
 	if out == "" {
 		return sess.WriteCSV(ctx, q, os.Stdout)
+	}
+	return sess.Export(ctx, q, out, format)
+}
+
+func runFreq(in engine.Input, col string, top int, out, view, saveView string, stdout io.Writer) error {
+	format := strings.TrimPrefix(strings.ToLower(filepath.Ext(out)), ".")
+	if out != "" && format != "csv" && format != "parquet" && format != "ndjson" {
+		return errors.New("--output must end in .csv, .parquet or .ndjson")
+	}
+	if top < 0 {
+		return errors.New("--top must be 0 or greater")
+	}
+	if saveView != "" {
+		return errors.New("--save-view needs --pivot")
+	}
+	ctx := context.Background()
+	sess, err := engine.OpenInput(ctx, in)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = sess.Close() }()
+	q := engine.NewSpec(sess.Columns())
+	if view != "" {
+		if q, err = sess.LoadView(ctx, view); err != nil {
+			return err
+		}
+	}
+	if err := q.ResolveFreq(col); err != nil {
+		return err
+	}
+	q.Sort = nil
+	q.Freq = &engine.FreqSpec{Col: col, Top: top}
+	if out == "" {
+		return sess.WriteCSV(ctx, q, stdout)
 	}
 	return sess.Export(ctx, q, out, format)
 }
