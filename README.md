@@ -21,11 +21,11 @@ pivotlens is an open source CSV, Parquet and NDJSON viewer for the terminal:
 an interactive grid backed by an embedded DuckDB. It is for anyone who needs
 to check a data file - a data engineer, an analyst, a backend developer
 looking at a log export - without opening a spreadsheet or writing a script.
-Point it at a file and you get a scrollable grid with sort, filter and
-pivot tables over millions of rows, no SQL required.
+Point it at a file and you get a scrollable grid with sort, filter, value
+counts and pivot tables over millions of rows, no SQL required.
 
 It is early, but opening a file, scrolling, sorting, filtering, column
-management, pivot tables and export all work today.
+management, value counts, pivot tables and export all work today.
 
 ## The problem
 
@@ -96,7 +96,7 @@ $ pivotlens --version
 pivotlens dev
 
 $ pivotlens
-usage: pivotlens [--pivot spec [-o out.csv]] [--head N] [--schema] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...
+usage: pivotlens [--pivot spec [-o out.csv]] [--freq column [--top N]] [--head N] [--schema] [--source-column[=name]] [--view file] [--save-view file] <file|glob|->...
 ```
 
 ## Several files and stdin
@@ -150,7 +150,9 @@ created_at,TIMESTAMP
 |---|---|
 | `-v`, `--version` | print the version and exit |
 | `--pivot spec` | print a pivot table as CSV and exit, see [Pivot tables](#pivot-tables) |
-| `-o`, `--output file` | with `--pivot`, write to a `.csv`, `.parquet` or `.ndjson` file instead of stdout |
+| `--freq column` | print value counts of a column as CSV and exit, see [Value counts](#value-counts) |
+| `--top N` | with `--freq`, print the top `N` values, `0` for all, see [Value counts](#value-counts) |
+| `-o`, `--output file` | with `--pivot` or `--freq`, write to a `.csv`, `.parquet` or `.ndjson` file instead of stdout |
 | `--view file` | open with the view saved in a JSON file, see [Saved views](#saved-views) |
 | `--save-view file` | with `--pivot`, save the view to a JSON file |
 | `--head N` | print the first `N` rows as CSV and exit, see [Head and schema](#head-and-schema) |
@@ -171,6 +173,7 @@ created_at,TIMESTAMP
 | `c` | manage columns: `space` hides, `J`/`K` reorder, `r` renames, `enter` applies, `esc` discards |
 | `e` | export the current view to a `.csv`, `.parquet` or `.ndjson` file |
 | `i` | show statistics for the current column over the filtered view: rows, nulls, distinct, min, max, and median, avg, sum for numeric columns |
+| `v` | value counts of the current column, see [Value counts](#value-counts) |
 | `p` | build a pivot table: pick rows, columns, aggregates and values with `j`/`k` and `enter`, `add value` adds another value, `esc` steps back |
 | `t` | on a pivot view, toggle the grand total row and total columns |
 | `%` | on a pivot view, cycle values as percent of row, of column, of grand total, then plain |
@@ -241,6 +244,41 @@ or columns whose field is NULL show up as `NULL` in the grid and as an empty fie
 export. An empty string in the column field is labeled `(empty)`.
 With totals on, the first row field is exported as text, so the `Total`
 label fits in the same column.
+
+## Value counts
+
+Press `v` on the current column and pivotlens counts its values over the
+filtered data. The view is a grid with the columns `value`, `count`,
+`percent`, `cum_percent` and `bar`, sorted by count with ties in value
+order. NULL shows as `(null)` and an empty string as `(empty)`. The `bar`
+column is a text bar for the terminal only; it never reaches an export or
+`--freq`.
+
+The view behaves like any other grid: scroll, `s` sort, `e` export and
+`u` back all work. `space` marks a row, `enter` closes the view and adds
+one typed filter for the current value or the marked rows: `= value`,
+`IS NULL`, or `IN (...)` for several marked rows. The filter shows in `F`
+and can be removed there, and `u` undoes it. The `(other)` row cannot be
+selected.
+
+A column with more distinct values than the limit shows the top 1000 and a
+last `(other)` row with the remaining count; the status bar says
+`top 1000 of N distinct`. `--top N` sets the limit, `0` removes it. The
+value counts view itself is transient: `w` saves the underlying filters,
+not the view.
+
+For scripts, `--freq column` prints the same table as CSV and exits. It
+works with files, globs, stdin and `--view` (filters of the saved view
+apply), and `-o` writes a `.csv`, `.parquet` or `.ndjson` file instead of
+stdout.
+
+```
+$ pivotlens --freq status testdata/tiny.csv
+value,count,percent,cum_percent
+COMPLETED,3,60,60
+FAILED,1,20,80
+PENDING,1,20,100
+```
 
 ## Saved views
 
@@ -319,6 +357,12 @@ Press `p` in `pivotlens`, pick a row field, a column field, an aggregate
 and a value field. For a script, run
 `pivotlens --pivot rows=region,cols=status,values=amount,agg=sum data.csv`
 and it prints the pivot as CSV. It works the same on Parquet and NDJSON.
+
+**How do I count distinct values in a CSV column?**
+Run `pivotlens --freq status data.csv` and it prints each value with its
+count, percent and cumulative percent as CSV. In the grid, press `v` on the
+column for the same table with a text bar, then press `enter` on a row to
+filter the data down to that value.
 
 **How do I inspect NDJSON or JSON Lines logs from the command line?**
 `pivotlens yourlogs.ndjson` reads the file as a table, one row per line, so

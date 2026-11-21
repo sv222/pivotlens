@@ -14,6 +14,8 @@ and this project uses [Semantic Versioning](https://semver.org/).
 - `--head N` prints the first N rows of the file as CSV and exits, so scripts can sample a file without the grid; it also accepts `--view`.
 - `--schema` prints the column names and types as CSV and exits.
 - Column statistics (`i`) for numeric columns now include the median.
+- Value counts: `v` on the current column counts its values over the filtered data and opens a grid with `value`, `count`, `percent`, `cum_percent` and a text bar, sorted by count. `enter` on a row closes the view and adds one typed filter for that value (`= value`, `IS NULL`, or `IN (...)` for several `space`-marked rows); the filter shows in `F` and `u` undoes it. `s`, `e` and `u` work as elsewhere. More than 1000 distinct values show the top 1000 plus an `(other)` row, and the status bar reports the truncation. NULL shows as `(null)`, an empty string as `(empty)`.
+- `--freq column` prints the value counts of a column as CSV and exits; `--top N` sets the limit, `0` for all values. Works with files, globs, stdin, `--view` and `-o`, like `--pivot`.
 
 ## [0.3.0] - 2026-11-03
 
