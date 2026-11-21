@@ -245,3 +245,39 @@ func TestFreqStatsSQLRefusedWithoutSpec(t *testing.T) {
 		t.Errorf("stats on a value counts view = %v, want ErrPivotStats", err)
 	}
 }
+
+func TestFreqExportKeepsTableAndDropsBar(t *testing.T) {
+	s := twelveValues(t)
+	q := NewSpec(s.Columns())
+	q.Freq = &FreqSpec{Col: "v", Top: 5}
+	text, err := q.ExportSQL("out.csv", "csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, col := range []string{`"value"`, `"count"`, `"percent"`, `"cum_percent"`} {
+		if !strings.Contains(text, col) {
+			t.Errorf("export SQL missing %s: %s", col, text)
+		}
+	}
+	if strings.Contains(text, "bar") {
+		t.Errorf("export SQL leaks the bar column: %s", text)
+	}
+	out := filepath.Join(t.TempDir(), "freq.csv")
+	if err := s.Export(context.Background(), q, out, "csv"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+	if len(lines) != 7 {
+		t.Fatalf("lines = %d: %q", len(lines), lines)
+	}
+	if lines[0] != "value,count,percent,cum_percent" {
+		t.Errorf("header = %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[6], "(other),7,") {
+		t.Errorf("last line = %q, want the other row", lines[6])
+	}
+}

@@ -368,3 +368,16 @@ func TestFreqOtherRowCannotBeSelected(t *testing.T) {
 		t.Error("enter on (other) must be refused")
 	}
 }
+
+func TestFreqExportKeyKeepsSpec(t *testing.T) {
+	m := freqModel(t)
+	next, _ := m.Update(press("e"))
+	got := next.(Model)
+	ep, ok := got.panel.(*exportPanel)
+	if !ok {
+		t.Fatalf("panel = %T, want *exportPanel", got.panel)
+	}
+	if ep.spec.Freq == nil || ep.spec.Freq.Col != "region" {
+		t.Errorf("export spec freq = %+v", ep.spec.Freq)
+	}
+}
