@@ -71,6 +71,20 @@ type pivotMsg struct {
 	err  error
 }
 
+type freqStatsMsg struct {
+	id       reqID
+	total    int64
+	distinct int64
+	err      error
+}
+
+func freqStatsCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, id reqID) tea.Cmd {
+	return func() tea.Msg {
+		st, err := s.FreqStats(ctx, q)
+		return freqStatsMsg{id: id, total: st.Total, distinct: st.Distinct, err: err}
+	}
+}
+
 func pivotCmd(ctx context.Context, s *engine.Session, q engine.QuerySpec, id reqID) tea.Cmd {
 	return func() tea.Msg {
 		r, err := s.ResolvePivot(ctx, q)

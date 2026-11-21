@@ -94,11 +94,19 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.errText = "filters are unavailable on a pivot view"
 			return m, nil
 		}
+		if m.spec.Freq != nil {
+			m.errText = "filters are unavailable on a value counts view"
+			return m, nil
+		}
 		m.panel = newFilterPanel(m.spec.Clone())
 		return m, nil
 	case "p":
 		if m.spec.Pivot != nil {
 			m.errText = "already a pivot view, press u to go back"
+			return m, nil
+		}
+		if m.spec.Freq != nil {
+			m.errText = "already a value counts view, press u to go back"
 			return m, nil
 		}
 		if len(m.headers) == 0 {
@@ -113,6 +121,10 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "f", "F":
 		if m.spec.Pivot != nil {
 			m.errText = "filters are unavailable on a pivot view"
+			return m, nil
+		}
+		if m.spec.Freq != nil {
+			m.errText = "filters are unavailable on a value counts view"
 			return m, nil
 		}
 		if m.colCursor >= len(m.headers) {
@@ -133,6 +145,10 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "c":
 		if m.spec.Pivot != nil {
 			m.errText = "columns are unavailable on a pivot view"
+			return m, nil
+		}
+		if m.spec.Freq != nil {
+			m.errText = "columns are unavailable on a value counts view"
 			return m, nil
 		}
 		m.panel = newColumnsPanel(m.spec.Clone())
@@ -164,6 +180,10 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.errText = "stats are unavailable on a pivot view"
 			return m, nil
 		}
+		if m.spec.Freq != nil {
+			m.errText = "stats are unavailable on a value counts view"
+			return m, nil
+		}
 		if m.colCursor >= len(m.headers) {
 			m.errText = "column index out of range"
 			return m, nil
@@ -187,6 +207,25 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			modes := append([]string{""}, engine.PivotPercents...)
 			p.Percent = modes[(slices.Index(modes, p.Percent)+1)%len(modes)]
 		})
+	case "v":
+		switch {
+		case m.spec.Pivot != nil:
+			m.errText = "value counts are unavailable on a pivot view"
+			return m, nil
+		case m.spec.Freq != nil:
+			m.errText = "already a value counts view, press u to go back"
+			return m, nil
+		case m.colCursor >= len(m.headers):
+			m.errText = "column index out of range"
+			return m, nil
+		}
+		m = m.push()
+		q := m.spec.Clone()
+		q.Sort = nil
+		q.Freq = &engine.FreqSpec{Col: m.headers[m.colCursor], Top: engine.DefaultTop}
+		m.spec = q
+		m.colCursor = 0
+		return m.reload()
 	case "u":
 		return m.undo()
 	}
@@ -331,6 +370,13 @@ func (m Model) renderStatus() string {
 	if m.spec.Pivot != nil {
 		parts = append(parts, "pivot: "+m.spec.Pivot.String())
 	}
+	if m.spec.Freq != nil {
+		parts = append(parts, "value counts: "+m.spec.Freq.Col)
+		if m.spec.Freq.Top > 0 && m.freqDistinct > int64(m.spec.Freq.Top) {
+			parts = append(parts, "top "+strconv.Itoa(m.spec.Freq.Top)+" of "+
+				strconv.FormatInt(m.freqDistinct, 10)+" distinct")
+		}
+	}
 	if m.spec.Filter != "" {
 		parts = append(parts, "filter: "+m.spec.Filter)
 	}
@@ -347,7 +393,9 @@ func (m Model) renderStatus() string {
 	if m.notice != "" {
 		parts = append(parts, m.notice)
 	}
-	if m.spec.Pivot != nil {
+	if m.spec.Freq != nil {
+		parts = append(parts, "[enter] filter  [space] mark  [s] sort  [e] export  [u] back  [q] quit")
+	} else if m.spec.Pivot != nil {
 		parts = append(parts, "[t] totals  [%] percent  [s] sort  [u] back  [q] quit")
 	} else {
 		parts = append(parts, "[/] filter  [s] sort  [u] undo  [q] quit")

@@ -41,6 +41,11 @@ type Model struct {
 	statsReq  reqID
 	pivotReq  reqID
 	viewReq   reqID
+	freqReq   reqID
+
+	marked       map[int]string
+	freqTotal    int64
+	freqDistinct int64
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -78,6 +83,9 @@ func displayNames(q engine.QuerySpec) []string {
 	if q.Pivot != nil {
 		return q.Pivot.Columns()
 	}
+	if q.Freq != nil {
+		return append(q.Freq.Columns(), barCol)
+	}
 	vis := q.Visible()
 	out := make([]string, len(vis))
 	for i, c := range vis {
@@ -105,12 +113,19 @@ func (m Model) reload() (tea.Model, tea.Cmd) {
 	m.counted = false
 	m.notice = ""
 	m.cursor, m.colStart, m.blockOff = 0, 0, 0
+	m.marked = nil
+	m.freqTotal, m.freqDistinct = 0, 0
 	m.headers = displayNames(m.spec)
-	return m, tea.Batch(
+	cmds := []tea.Cmd{
 		fetchPageCmd(ctx, m.sess, m.spec, m.pageReq, PageSize, 0),
 		countCmd(ctx, m.sess, m.spec, m.specReq),
 		widthsCmd(ctx, m.sess, m.spec, m.specReq),
-	)
+	}
+	if m.spec.Freq != nil {
+		m.freqReq++
+		cmds = append(cmds, freqStatsCmd(ctx, m.sess, m.spec, m.freqReq))
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) push() Model {
@@ -145,8 +160,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rows = msg.rows
 		if len(msg.cols) > 0 {
 			m.headers = msg.cols
-			if len(m.widths) != len(msg.cols) {
+			if m.spec.Freq != nil {
+				m.headers = append(m.headers, barCol)
+				m.rows = freqWithBars(msg.rows)
+			}
+			if len(m.widths) != len(m.headers) {
 				m.widths = Fit(nil, m.headers)
+				if m.spec.Freq != nil && len(m.widths) > 0 {
+					m.widths[len(m.widths)-1] = FreqBarWidth
+				}
 			}
 			if m.colCursor >= len(m.headers) {
 				m.colCursor, m.colStart = len(m.headers)-1, 0
@@ -170,6 +192,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.err == nil {
 			m.widths = Fit(msg.w, m.headers)
+			if m.spec.Freq != nil && len(m.widths) > 0 {
+				m.widths[len(m.widths)-1] = FreqBarWidth
+			}
 		}
 		return m, nil
 
@@ -238,6 +263,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spec = msg.spec
 		m.colCursor = 0
 		return m.reload()
+
+	case freqStatsMsg:
+		if msg.id != m.freqReq {
+			return m, nil
+		}
+		if msg.err == nil {
+			m.freqTotal, m.freqDistinct = msg.total, msg.distinct
+		}
+		return m, nil
 
 	case statsMsg:
 		if msg.id != m.statsReq || m.panel == nil {
