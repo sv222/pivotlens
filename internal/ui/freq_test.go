@@ -1,7 +1,10 @@
 package ui
 
 import (
+	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -163,5 +166,205 @@ func TestFreqPageMsgKeepsBarAcrossPages(t *testing.T) {
 	}
 	if got.rows[0][4] != strings.Repeat("\u2588", 8) || got.rows[1][4] != strings.Repeat("\u2588", 12) {
 		t.Errorf("bars = %q, %q", got.rows[0][4], got.rows[1][4])
+	}
+}
+
+func modelOn(t *testing.T, name string) Model {
+	t.Helper()
+	s, err := engine.Open(context.Background(), filepath.Join("..", "..", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	m := New(s)
+	m.headers = displayNames(m.spec)
+	return m
+}
+
+func TestFreqEnterAddsEqFilter(t *testing.T) {
+	m := freqModel(t)
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if cmd == nil {
+		t.Fatal("enter must reload the grid")
+	}
+	if m.spec.Freq != nil {
+		t.Error("enter must close the value counts view")
+	}
+	if len(m.spec.Filters) != 1 {
+		t.Fatalf("filters = %+v", m.spec.Filters)
+	}
+	if f := m.spec.Filters[0]; f.Col != "region" || f.Op != engine.OpEq || f.Value != "EU-CENT" || f.ColType != "VARCHAR" {
+		t.Errorf("filter = %+v", f)
+	}
+	if len(m.hist) != 1 {
+		t.Errorf("history has %d entries, want 1", len(m.hist))
+	}
+	m = drainBatch(t, m, cmd)
+	if len(m.rows) != 2 || m.rows[0][0] != "EU-CENT" || m.rows[1][0] != "EU-CENT" {
+		t.Errorf("rows after drill-down = %v, want the 2 EU-CENT rows", m.rows)
+	}
+	back, _ := m.Update(press("u"))
+	if b := back.(Model); b.spec.Freq != nil || len(b.spec.Filters) != 0 {
+		t.Errorf("u after drill-down leaves %+v, want the unfiltered parent", b.spec)
+	}
+}
+
+func TestFreqEnterNullRow(t *testing.T) {
+	m := modelOn(t, "nulls.csv")
+	m.colCursor = 1
+	next, cmd := m.Update(press("v"))
+	m = drainBatch(t, next.(Model), cmd)
+	if m.spec.Freq.Col != "status" {
+		t.Fatalf("freq = %+v", m.spec.Freq)
+	}
+	if m.rows[1][0] != engine.FreqNullText {
+		t.Fatalf("rows = %v, want the null row at 1", m.rows)
+	}
+	next, _ = m.Update(press("j"))
+	m = next.(Model)
+	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if len(m.spec.Filters) != 1 || m.spec.Filters[0].Op != engine.OpNull || m.spec.Filters[0].Col != "status" {
+		t.Fatalf("filters = %+v, want status is null", m.spec.Filters)
+	}
+	m = drainBatch(t, m, cmd)
+	if len(m.rows) != 1 || m.rows[0][0] != "US" {
+		t.Errorf("rows = %v, want the null-status row", m.rows)
+	}
+}
+
+func TestFreqEnterEmptyRow(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "e.ndjson")
+	if err := os.WriteFile(p, []byte("{\"v\":\"x\"}\n{\"v\":\"\"}\n{\"v\":null}\n{\"v\":\"x\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := engine.Open(context.Background(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	m := New(s)
+	m.headers = displayNames(m.spec)
+	next, cmd := m.Update(press("v"))
+	m = drainBatch(t, next.(Model), cmd)
+	if m.rows[1][0] != engine.FreqEmptyText {
+		t.Fatalf("rows = %v, want the empty row at 1", m.rows)
+	}
+	next, _ = m.Update(press("j"))
+	m = next.(Model)
+	next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if len(m.spec.Filters) != 1 {
+		t.Fatalf("filters = %+v", m.spec.Filters)
+	}
+	if f := m.spec.Filters[0]; f.Op != engine.OpEq || f.Value != "" || f.ColType != "VARCHAR" {
+		t.Errorf("filter = %+v, want v = empty string", f)
+	}
+	m = drainBatch(t, m, cmd)
+	if len(m.rows) != 1 || m.rows[0][0] != "" {
+		t.Errorf("rows = %v, want the empty-string row", m.rows)
+	}
+}
+
+func TestFreqMarkedRowsAddInFilter(t *testing.T) {
+	m := freqModel(t)
+	space := tea.KeyPressMsg{Code: ' '}
+	next, _ := m.Update(space)
+	m = next.(Model)
+	next, _ = m.Update(press("j"))
+	m = next.(Model)
+	next, _ = m.Update(space)
+	m = next.(Model)
+	if len(m.marked) != 2 {
+		t.Fatalf("marked = %v", m.marked)
+	}
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if len(m.spec.Filters) != 1 || m.spec.Filters[0].Op != engine.OpIn {
+		t.Fatalf("filters = %+v, want one in filter", m.spec.Filters)
+	}
+	if !reflect.DeepEqual(m.spec.Filters[0].Values, []string{"EU-CENT", "AP-SOUTH"}) {
+		t.Errorf("values = %v", m.spec.Filters[0].Values)
+	}
+	if !strings.Contains(m.renderStatus(), "region in (EU-CENT, AP-SOUTH)") {
+		t.Errorf("status = %q", m.renderStatus())
+	}
+	m = drainBatch(t, m, cmd)
+	if len(m.rows) != 3 {
+		t.Errorf("rows = %d, want 3", len(m.rows))
+	}
+	back, _ := m.Update(press("u"))
+	if b := back.(Model); b.spec.Freq != nil || len(b.spec.Filters) != 0 {
+		t.Errorf("u after drill-down leaves %+v, want the unfiltered parent", b.spec)
+	}
+}
+
+func TestFreqMarkedNullDroppedFromIn(t *testing.T) {
+	m := modelOn(t, "nulls.csv")
+	m.colCursor = 1
+	next, cmd := m.Update(press("v"))
+	m = drainBatch(t, next.(Model), cmd)
+	space := tea.KeyPressMsg{Code: ' '}
+	next, _ = m.Update(space)
+	m = next.(Model)
+	next, _ = m.Update(press("j"))
+	m = next.(Model)
+	next, _ = m.Update(space)
+	m = next.(Model)
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if len(m.spec.Filters) != 1 {
+		t.Fatalf("filters = %+v", m.spec.Filters)
+	}
+	if f := m.spec.Filters[0]; f.Op != engine.OpIn || !reflect.DeepEqual(f.Values, []string{"OK"}) {
+		t.Errorf("filter = %+v, want in (OK)", f)
+	}
+	m = drainBatch(t, m, cmd)
+	if len(m.rows) != 3 {
+		t.Errorf("rows = %d, want the 3 OK rows", len(m.rows))
+	}
+}
+
+func TestFreqSpaceToggles(t *testing.T) {
+	m := freqModel(t)
+	space := tea.KeyPressMsg{Code: ' '}
+	next, _ := m.Update(space)
+	m = next.(Model)
+	if len(m.marked) != 1 {
+		t.Fatalf("marked = %v", m.marked)
+	}
+	next, _ = m.Update(space)
+	m = next.(Model)
+	if len(m.marked) != 0 {
+		t.Errorf("marked = %v, want empty after the second space", m.marked)
+	}
+}
+
+func TestFreqMarkedRowRendersStyled(t *testing.T) {
+	m := freqModel(t)
+	plain := m.renderBody()
+	next, _ := m.Update(tea.KeyPressMsg{Code: ' '})
+	m = next.(Model)
+	if m.renderBody() == plain {
+		t.Error("a marked row must render differently")
+	}
+}
+
+func TestFreqOtherRowCannotBeSelected(t *testing.T) {
+	m := freqModel(t)
+	m.rows = [][]string{{engine.FreqOtherText, "7", "58.33", "100", strings.Repeat("\u2588", 12)}}
+	space := tea.KeyPressMsg{Code: ' '}
+	next, _ := m.Update(space)
+	m = next.(Model)
+	if len(m.marked) != 0 || m.errText == "" {
+		t.Error("space on (other) must be refused")
+	}
+	m.errText = ""
+	next, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if m.spec.Freq == nil || m.errText == "" {
+		t.Error("enter on (other) must be refused")
 	}
 }

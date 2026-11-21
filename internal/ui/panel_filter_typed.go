@@ -44,7 +44,7 @@ func (p *filterTypedPanel) apply(v string) PanelAction {
 	replaced := false
 	if p.editing != nil {
 		for i := range clone.Filters {
-			if clone.Filters[i] == *p.editing {
+			if clone.Filters[i].Equal(*p.editing) {
 				clone.Filters[i] = nf
 				replaced = true
 			}

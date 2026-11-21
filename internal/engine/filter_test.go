@@ -156,3 +156,43 @@ func TestValidType(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterInPred(t *testing.T) {
+	f := FilterSpec{Col: "status", Op: OpIn, Values: []string{"COMPLETED", "FAILED"}, ColType: "VARCHAR"}
+	got, err := f.pred()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `CAST("status" AS VARCHAR) IN (CAST('COMPLETED' AS VARCHAR), CAST('FAILED' AS VARCHAR))`
+	if got != want {
+		t.Errorf("pred = %q, want %q", got, want)
+	}
+	f.Values = nil
+	if _, err := f.pred(); err == nil {
+		t.Error("in filter without values must be refused")
+	}
+}
+
+func TestFilterInStringAndText(t *testing.T) {
+	f := FilterSpec{Col: "status", Op: OpIn, Values: []string{"OK", "FAIL"}}
+	if got, want := f.String(), "status in (OK, FAIL)"; got != want {
+		t.Errorf("String() = %q, want %q", got, want)
+	}
+	b, err := OpIn.MarshalText()
+	if err != nil || string(b) != "in" {
+		t.Fatalf("MarshalText = %q, %v", b, err)
+	}
+	var op Op
+	if err := op.UnmarshalText([]byte("in")); err != nil || op != OpIn {
+		t.Fatalf("UnmarshalText = %v, %v", op, err)
+	}
+}
+
+func TestCloneCopiesInValues(t *testing.T) {
+	q := QuerySpec{Filters: []FilterSpec{{Col: "a", Op: OpIn, Values: []string{"x"}}}}
+	n := q.Clone()
+	n.Filters[0].Values[0] = "y"
+	if q.Filters[0].Values[0] != "x" {
+		t.Error("Clone shares the in values")
+	}
+}

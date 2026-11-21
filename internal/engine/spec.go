@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -79,6 +80,11 @@ func (q QuerySpec) Clone() QuerySpec {
 	n.Cols = append([]ColSpec(nil), q.Cols...)
 	n.DropNull = append([]string(nil), q.DropNull...)
 	n.Filters = append([]FilterSpec(nil), q.Filters...)
+	for i := range n.Filters {
+		if n.Filters[i].Values != nil {
+			n.Filters[i].Values = append([]string(nil), n.Filters[i].Values...)
+		}
+	}
 	n.Sort = append([]SortKey(nil), q.Sort...)
 	if q.Pivot != nil {
 		p := *q.Pivot
@@ -108,6 +114,7 @@ const (
 	OpEnds
 	OpNull
 	OpNotNull
+	OpIn
 )
 
 func (o Op) String() string {
@@ -134,34 +141,47 @@ func (o Op) String() string {
 		return "is null"
 	case OpNotNull:
 		return "is not null"
+	case OpIn:
+		return "in"
 	default:
 		return "?"
 	}
 }
 
 type FilterSpec struct {
-	Col     string `json:"col"`
-	Op      Op     `json:"op"`
-	Value   string `json:"value,omitempty"`
-	ColType string `json:"col_type,omitempty"`
+	Col     string   `json:"col"`
+	Op      Op       `json:"op"`
+	Value   string   `json:"value,omitempty"`
+	ColType string   `json:"col_type,omitempty"`
+	Values  []string `json:"values,omitempty"`
 }
 
 func (f FilterSpec) String() string {
+	if f.Op == OpIn {
+		return f.Col + " in (" + strings.Join(f.Values, ", ") + ")"
+	}
 	if f.Op == OpNull || f.Op == OpNotNull {
 		return f.Col + " " + f.Op.String()
 	}
 	return f.Col + " " + f.Op.String() + " " + f.Value
 }
 
+func (f FilterSpec) Equal(g FilterSpec) bool {
+	if f.Col != g.Col || f.Op != g.Op || f.Value != g.Value || f.ColType != g.ColType {
+		return false
+	}
+	return slices.Equal(f.Values, g.Values)
+}
+
 func (o Op) MarshalText() ([]byte, error) {
-	if o < OpEq || o > OpNotNull {
+	if o < OpEq || o > OpIn {
 		return nil, fmt.Errorf("unknown filter operator %d", int(o))
 	}
 	return []byte(o.String()), nil
 }
 
 func (o *Op) UnmarshalText(b []byte) error {
-	for c := OpEq; c <= OpNotNull; c++ {
+	for c := OpEq; c <= OpIn; c++ {
 		if c.String() == string(b) {
 			*o = c
 			return nil

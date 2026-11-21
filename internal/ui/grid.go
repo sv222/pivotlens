@@ -226,6 +226,14 @@ func (m Model) updateGrid(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.spec = q
 		m.colCursor = 0
 		return m.reload()
+	case "space":
+		if m.spec.Freq != nil {
+			return m.toggleMark()
+		}
+	case "enter":
+		if m.spec.Freq != nil {
+			return m.freqDrill()
+		}
 	case "u":
 		return m.undo()
 	}
@@ -341,6 +349,9 @@ func (m Model) renderBody() string {
 			cells = append(cells, c)
 		}
 		line := strings.Join(cells, " │ ")
+		if _, ok := m.marked[r]; ok {
+			line = m.styles.Selected.Render(line)
+		}
 		if r == m.cursor {
 			line = m.styles.Cursor.Render(line)
 		}

@@ -94,6 +94,22 @@ func (f FilterSpec) pred() (string, error) {
 		return col + " IS NULL", nil
 	case OpNotNull:
 		return col + " IS NOT NULL", nil
+	case OpIn:
+		if len(f.Values) == 0 {
+			return "", errors.New("in filter needs values")
+		}
+		t := f.ColType
+		if t == "" {
+			t = "VARCHAR"
+		}
+		if !validType(t) {
+			return "", fmt.Errorf("unsupported column type %q", t)
+		}
+		parts := make([]string, len(f.Values))
+		for i, v := range f.Values {
+			parts[i] = "CAST(" + ql(v) + " AS " + t + ")"
+		}
+		return "CAST(" + col + " AS " + t + ") IN (" + strings.Join(parts, ", ") + ")", nil
 	case OpContains, OpStarts, OpEnds:
 		e := likeEscape(f.Value)
 		var pat string

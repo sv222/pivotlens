@@ -9,6 +9,7 @@ type Styles struct {
 	Null     lipgloss.Style
 	Status   lipgloss.Style
 	ErrorBar lipgloss.Style
+	Selected lipgloss.Style
 }
 
 func DefaultStyles() Styles {
@@ -19,5 +20,6 @@ func DefaultStyles() Styles {
 		Null:     lipgloss.NewStyle().Faint(true),
 		Status:   lipgloss.NewStyle().Faint(true),
 		ErrorBar: lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
+		Selected: lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
 	}
 }
